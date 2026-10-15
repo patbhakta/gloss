@@ -18,7 +18,7 @@ export const COVER_USD = 0.02;
 export async function paintCover(req: { scene: string; topic: TopicKey; apiKey?: string; signal?: AbortSignal }): Promise<{ ok: true; jpeg: Uint8Array } | { ok: false; error: string }> {
   const apiKey = req.apiKey?.trim() || process.env.TOGETHER_API_KEY;
   if (!apiKey) return { ok: false, error: "No Together API key." };
-  const prompt = `Editorial risograph print. ${req.scene.replace(/\.?$/, ".")} Two-colour palette of ${TOPIC[req.topic].inks} ink on warm cream paper filling the whole image, grain and halftone texture, mid-century book-cover illustration, wordless, no lettering, no border.`;
+  const prompt = `Editorial risograph print. ${req.scene.replace(/\.?$/, ".")} Two-color palette of ${TOPIC[req.topic].inks} ink on warm cream paper filling the whole image, grain and halftone texture, mid-century book-cover illustration, wordless, no lettering, no border.`;
   let res: Response;
   try {
     res = await fetch("https://api.together.xyz/v1/images/generations", {

@@ -1,24 +1,25 @@
 "use client";
 
-import { Show, SignInButton, UserButton } from "@clerk/nextjs";
 import { barBtn } from "@/components/ui/Popover";
 
-/** Signed out: a quiet "Sign in". Signed in: the avatar, with Clerk's account menu. */
+/** bhakta.us single-user chip (matches lib/clerk-shim LOCAL_USER). */
+const LOCAL_USER_NAME = "Pat Bhakta";
+
+/**
+ * bhakta.us: single-user interim account chip. Real per-persona accounts land
+ * with GLS-2 (Better Auth); until then show a working avatar instead of a dead
+ * "Sign in" button.
+ */
 export function Account() {
   return (
-    <>
-      <Show when="signed-out">
-        <SignInButton mode="modal">
-          <button type="button" className={`${barBtn} !px-3 whitespace-nowrap`} data-tip="Keep your highlights and notes on every device">
-            Sign in
-          </button>
-        </SignInButton>
-      </Show>
-      <Show when="signed-in">
-        <span className="grid size-9 place-items-center">
-          <UserButton appearance={{ elements: { avatarBox: "size-7" } }} />
-        </span>
-      </Show>
-    </>
+    <span
+      className="grid size-9 place-items-center"
+      data-tip={LOCAL_USER_NAME}
+      title={LOCAL_USER_NAME}
+    >
+      <span className="grid size-7 place-items-center rounded-full bg-sunk text-[12px] font-semibold text-ink-2 select-none">
+        PB
+      </span>
+    </span>
   );
 }

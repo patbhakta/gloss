@@ -216,8 +216,8 @@ export function BookOpen({
                       type="button"
                       className="ob-icon"
                       aria-pressed={book.favorite}
-                      aria-label={book.favorite ? "Remove from favourites" : "Add to favourites"}
-                      data-tip={book.favorite ? "Favourite" : "Add to favourites"}
+                      aria-label={book.favorite ? "Remove from favorites" : "Add to favorites"}
+                      data-tip={book.favorite ? "Favorite" : "Add to favorites"}
                       onClick={() => onShelve(book, { favorite: !book.favorite })}
                     >
                       <Star size={15} fill={book.favorite ? "currentColor" : "none"} />

@@ -100,7 +100,7 @@ export function TopicPage({ topic: t, books, tools, onOpen }: { topic: Topic; bo
                   <span className={b.pct >= 1 ? "text-good" : "text-rubric-text"}>{b.pct >= 1 ? "Read" : `${Math.round(b.pct * 100)}%`}</span>
                 </>
               )}
-              {b.favorite && <span aria-label="Favourite">⭐</span>}
+              {b.favorite && <span aria-label="Favorite">⭐</span>}
             </p>
           </li>
         ))}

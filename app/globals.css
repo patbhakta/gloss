@@ -1,5 +1,21 @@
 @import "tailwindcss";
 
+/* Huible brand type — self-hosted EB Garamond (OFL, see public/fonts). */
+@font-face {
+  font-family: "EB Garamond";
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url("/fonts/eb-garamond-variable.woff2") format("woff2");
+}
+@font-face {
+  font-family: "EB Garamond";
+  font-style: italic;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url("/fonts/eb-garamond-italic-variable.woff2") format("woff2");
+}
+
 /* ==========================================================================
    Gloss. A critical edition for anything you read.
    Paper, ink, a yellow highlighter for you and a vermilion pen for the model.
@@ -167,7 +183,7 @@
   --rubric-wash-strong: color-mix(in oklab, var(--rubric) 17%, transparent);
   --rubric-key: color-mix(in oklab, var(--rubric) var(--key-a, 13%), transparent);
   --selection: color-mix(in oklab, var(--rubric) 18%, transparent);
-  --font-serif: var(--nf-serif), "Iowan Old Style", Georgia, serif;
+  --font-serif: "EB Garamond", var(--nf-serif), "Iowan Old Style", Georgia, serif;
   --font-sans: var(--nf-sans), ui-sans-serif, system-ui, sans-serif;
   --font-book: var(--nf-book), "Iowan Old Style", Georgia, serif;
   --font-legible: var(--nf-legible), ui-sans-serif, system-ui, sans-serif;

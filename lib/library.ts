@@ -201,7 +201,7 @@ export type Sort = "topic" | "recent" | "color" | "length";
 export const SORTS: { key: Sort; label: string }[] = [
   { key: "topic", label: "Topic" },
   { key: "recent", label: "Recent" },
-  { key: "color", label: "Colour" },
+  { key: "color", label: "Color" },
   { key: "length", label: "Length" },
 ];
 
@@ -237,7 +237,7 @@ export type TagKey = "favorite" | "reading" | "finished" | "quick" | "long" | "a
 
 export const TAGS: { key: TagKey; label: string; test: (b: Book) => boolean }[] = [
   { key: "reading", label: "Reading now", test: (b) => b.pct > 0 && b.pct < 1 },
-  { key: "favorite", label: "Favourites", test: (b) => b.favorite },
+  { key: "favorite", label: "Favorites", test: (b) => b.favorite },
   { key: "finished", label: "Finished", test: (b) => b.pct >= 1 },
   { key: "quick", label: "Under 10 min", test: (b) => b.minutes < 10 },
   { key: "long", label: "Long reads", test: (b) => b.minutes >= 45 },

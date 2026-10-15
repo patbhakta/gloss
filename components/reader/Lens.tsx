@@ -420,7 +420,7 @@ export function Lens({ rootEl, openHighlight }: { rootEl: HTMLElement | null; op
 
             {existing ? (
               <>
-                <div className="flex items-center gap-2 px-2" role="radiogroup" aria-label="Highlight colour">
+                <div className="flex items-center gap-2 px-2" role="radiogroup" aria-label="Highlight color">
                   {MARKERS.map((m) => (
                     <button
                       key={m.key}
@@ -451,7 +451,7 @@ export function Lens({ rootEl, openHighlight }: { rootEl: HTMLElement | null; op
               </>
             ) : (
               <div className="group/hl flex items-center">
-                <LensIcon label="Highlight" tip={tipProps("Highlight", "Hover for colours")} onClick={() => highlight(marker)}>
+                <LensIcon label="Highlight" tip={tipProps("Highlight", "Hover for colors")} onClick={() => highlight(marker)}>
                   <span className="relative">
                     <Highlighter size={15} />
                     <span aria-hidden className="absolute -bottom-[3px] -right-[3px] size-[7px] rounded-full ring-2 ring-[var(--lens-bg)]" style={{ background: markerColor }} />
