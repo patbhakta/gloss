@@ -23,6 +23,9 @@
       }
     ],
     "paths": {
+      "@clerk/nextjs/server": ["./lib/clerk-shim.ts"],
+      "@clerk/nextjs": ["./lib/clerk-client-shim.tsx"],
+      "@clerk/shared": ["./lib/clerk-client-shim.ts"],
       "@/*": [
         "./*"
       ]

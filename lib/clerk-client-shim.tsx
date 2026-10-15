@@ -1,0 +1,53 @@
+"use client";
+
+/**
+ * bhakta.us: client-side Clerk shim. Renders children as if signed in;
+ * buttons become no-ops. Keeps upstream components compiling untouched.
+ */
+
+export const LOCAL_USER = {
+  id: "pat",
+  firstName: "Pat",
+  fullName: "Pat Bhakta",
+  imageUrl: "",
+};
+
+export function useUser() {
+  return { user: LOCAL_USER, isSignedIn: true, isLoaded: true };
+}
+
+export function useAuth() {
+  return { userId: LOCAL_USER.id, isSignedIn: true, isLoaded: true };
+}
+
+export function useClerk() {
+  return {
+    openSignIn: () => {},
+    openSignUp: () => {},
+    signOut: () => {},
+  };
+}
+
+export function SignedIn({ children }: { children?: React.ReactNode }) {
+  return <>{children}</>;
+}
+
+export function SignedOut({ children }: { children?: React.ReactNode }) {
+  return null;
+}
+
+export function SignInButton({ children }: { children?: React.ReactNode; mode?: string }) {
+  return <>{children}</>;
+}
+
+export function SignUpButton({ children }: { children?: React.ReactNode; mode?: string }) {
+  return <>{children}</>;
+}
+
+export function UserButton(_: { appearance?: unknown }) {
+  return null;
+}
+
+export function Show({ children, when }: { children?: React.ReactNode; when: boolean | string }) {
+  return when ? <>{children}</> : null;
+}

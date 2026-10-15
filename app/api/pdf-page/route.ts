@@ -10,7 +10,7 @@ export const maxDuration = 120;
  * model Together serves per request; the dedicated OCR models (GLM-OCR,
  * DeepSeek-OCR-2) need their own endpoint. Checked 2026-10-10.
  */
-const MODEL = "Qwen/Qwen3.8-Flash";
+const MODEL = "glm-4.6v-flash"; // bhakta.us: vision on zai sub
 const PRICE = { inPerM: 0.15, outPerM: 0.47 };
 /**
  * mode "layout": a page whose text layer reads but whose layout came out
@@ -18,7 +18,7 @@ const PRICE = { inPerM: 0.15, outPerM: 0.47 };
  * (lib/upgrade.ts). Qwen3.5-9B scored 6.9/10 on such pages in
  * scripts/pdf-eval against 3.9 for the text layer, at about $0.0005 a page.
  */
-const LAYOUT_MODEL = "Qwen/Qwen3.5-9B";
+const LAYOUT_MODEL = "glm-4.6v-flash";
 const LAYOUT_PRICE = { inPerM: 0.17, outPerM: 0.25 };
 const MAX_IMAGE_CHARS = 3_500_000;
 

@@ -30,13 +30,16 @@ export type ModelEntry = {
  */
 export const MODELS = {
   flash: {
-    id: "deepseek-ai/DeepSeek-V4.1-Flash",
-    label: "DeepSeek V4.1 Flash",
+    // bhakta.us: routed to our z.ai subscription (GLM_BASE_URL), glm-5.3-flash.
+    // reasoning_effort low + enable_thinking false are forced in lib/together.ts:
+    // GLM ignores enable_thinking alone (upstream bake-off note).
+    id: "glm-5.3-flash",
+    label: "GLM 5.3 Flash",
     short: "Quick",
     blurb: "Answers in about half a second. Best for most questions.",
-    inPerM: 0.3,
-    cachedPerM: 0.006,
-    outPerM: 1.2,
+    inPerM: 0,
+    cachedPerM: 0,
+    outPerM: 0,
   },
 } as const satisfies Record<string, ModelEntry>;
 

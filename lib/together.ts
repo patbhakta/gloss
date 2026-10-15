@@ -9,7 +9,9 @@
  *    Verified per model on 2026-10-08 with the full sample article (11k tokens).
  */
 
-export const TOGETHER_URL = "https://api.together.xyz/v1/chat/completions";
+export const TOGETHER_URL = process.env.GLM_BASE_URL
+  ? `${process.env.GLM_BASE_URL.replace(/\/$/, "")}/chat/completions`
+  : "https://api.together.xyz/v1/chat/completions";
 export const APP_UA = "Gloss/0.1";
 
 import { MODELS, costFor, type ModelEntry, type ModelKey, type StreamEvent, type Usage } from "./models";
@@ -85,6 +87,7 @@ export async function* streamChat(req: {
         temperature: req.temperature ?? 0.4,
         max_tokens: req.maxTokens ?? 900,
         chat_template_kwargs: { enable_thinking: false },
+        reasoning_effort: "low",
         messages: req.messages,
         ...(req.tools ? { tools: req.tools, tool_choice: req.toolChoice ?? "auto" } : {}),
       }),
