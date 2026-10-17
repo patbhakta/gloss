@@ -115,7 +115,9 @@ export async function articleDoc(userId: string, id: string): Promise<unknown | 
   return rows.length ? rows[0].doc : null;
 }
 
-/** One statement per table: unpack the JSON array of rows and upsert them all. An article pushed without its text keeps the stored one. */
+/** One statement per table: unpack the JSON array of rows and upsert them all. An article pushed without its text keeps the stored one.
+ *  A tombstone always wins: a device may not push a row back to life after the
+ *  server deleted it — that is the stale-device resurrection loop. */
 function upsert(table: Collection): string {
   const isArticles = table === "articles";
   return `insert into ${table} (user_id, id, article_id, data, deleted, updated_at${isArticles ? ", doc" : ""})
@@ -124,7 +126,8 @@ function upsert(table: Collection): string {
     on conflict (user_id, id) do update set
       article_id = excluded.article_id, data = excluded.data, deleted = excluded.deleted, updated_at = now()${
         isArticles ? ", doc = case when excluded.deleted then null else coalesce(excluded.doc, articles.doc) end" : ""
-      }`;
+      }
+    where not (${table}.deleted and not excluded.deleted)`;
 }
 
 /* ---------- painted covers ---------- */
