@@ -154,7 +154,10 @@ type State = Persisted &
  * shelf, highlights or notes in a shared browser. The key carries the active
  * limbic; switching limbics reloads, which re-hydrates from the other key.
  */
-const KEY = `gloss:v1:${limbicId()}`;
+// v2 (2026-10-17): the great ghost purge. Caches from v1 could hold rows whose
+// server records were hard-deleted — no tombstone could ever reach them. A new
+// key starts every device from server truth in one pull.
+const KEY = `gloss:v2:${limbicId()}`;
 const DOC_PREFIX = "gloss:doc:";
 
 
@@ -190,7 +193,10 @@ export const useStore = create<State>((set, get) => ({
       // the Chandler chapters that were once shelved to him by mistake — those
       // are dropped here and pushed as tombstones, so every device cleans up.
       // Pat only: another limbic starts from an empty shelf, never Pat's.
-      if (limbicId() === "pat" && !localStorage.getItem(KEY) && localStorage.getItem("gloss:v1")) {
+      // (The pre-limbic migration below read v1 directly; with v2 it would
+      // re-import long-purged ghosts, so it only ever ran for the v1→v1 era.
+      // Kept inert: no v1 key satisfies it anymore once v2 exists.) */
+      if (false) {
         try {
           const old = JSON.parse(localStorage.getItem("gloss:v1") || "{}") as Partial<Persisted>;
           old.library = (old.library ?? []).filter((x) => !/^Chandler\b/i.test(String(x.title ?? "")));
