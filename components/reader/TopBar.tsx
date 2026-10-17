@@ -134,7 +134,7 @@ export function TopBar({ currentN, pastTitle, listenFrom }: { currentN: number |
             data-tip-kbd="N"
           >
             <NotebookPen size={16} strokeWidth={1.8} />
-            <span className="hidden sm:inline">Notebook</span>
+            <span className="hidden sm:inline">Diary</span>
             {count > 0 && (
               <span className="min-w-[18px] rounded-full bg-[var(--rubric)] px-1.5 text-center text-[11px] font-semibold leading-[18px] tabular-nums text-white">{count}</span>
             )}
