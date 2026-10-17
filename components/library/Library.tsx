@@ -174,10 +174,10 @@ export function Library() {
       agent: false,
       sample: true,
     }));
-    return [...mine, ...samples];
+    return mine;
     // `own.length` is derived from `library`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [library, progress, highlights, hydrated, prefs.hiddenSamples]);
+  }, [library, progress, highlights, hydrated]);
 
   const sorted = useMemo(() => sortBooks(books, sort), [books, sort]);
 
