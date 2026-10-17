@@ -50,7 +50,7 @@ export async function POST() {
         userId,
         p.id,
         JSON.stringify({ id: p.id, title: p.title, author: "Hume", published: "", sourceUrl: "", topic: "emotional-intelligence", addedBy: "agent", words: 90, addedAt: Date.now() }),
-        JSON.stringify({ v: 3, title: p.title, author: "Hume", blocks: blocks }),
+        JSON.stringify({ id: p.id, v: 3, title: p.title, author: "Hume", blocks: blocks }),
       ],
     );
     // the reading as a margin note, anchored to the clip block
