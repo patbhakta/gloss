@@ -215,7 +215,7 @@ function parseMarkdown(input: string, opts: { title?: string; takeTitle: boolean
 
   for (const raw of chunks) {
     // Images have nothing behind them here; a figure's caption, if any, stays as text.
-    const chunk = raw.replace(/^!\[[^\]]*\]\([^)]*\)\s*$/gm, "").trim();
+    const chunk = raw.replace(/^!\[[^\]]*\]\(https?:[^)]*\)\s*$/gm, "").trim();
     if (!chunk || /^(-{3,}|\*{3,})$/.test(chunk)) continue;
     const h = chunk.match(/^(#{1,6})\s+(.+)$/);
     if (h) {
