@@ -191,7 +191,7 @@ export function lookOf(b: Pick<Book, "id" | "topic" | "minutes">): Look {
   const hit = looks.get(key);
   if (hit) return hit;
   const r = rng(hash(b.id));
-  const shades = TOPIC[b.topic].shades;
+  const shades = topicMeta(b.topic).shades;
   // Mostly the base and deep cloths; the light and pale ones now and then, for rhythm.
   const pick = r();
   const color = shades[pick < 0.38 ? 0 : pick < 0.7 ? 2 : pick < 0.88 ? 1 : 3];
