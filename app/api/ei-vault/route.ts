@@ -49,7 +49,7 @@ export async function POST() {
       [
         userId,
         p.id,
-        JSON.stringify({ title: p.title, author: "Hume prosody atlas", published: "", sourceUrl: "", topic: "emotional-intelligence", addedBy: "agent", words: 90, addedAt: Date.now() }),
+        JSON.stringify({ id: p.id, title: p.title, author: "Hume prosody atlas", published: "", sourceUrl: "", topic: "emotional-intelligence", addedBy: "agent", words: 90, addedAt: Date.now() }),
         JSON.stringify({ v: 3, title: p.title, author: "Hume prosody atlas", blocks: blocks }),
       ],
     );
