@@ -228,7 +228,11 @@ function BlockImpl({ block, n, first, marks, activeGloss, hoverGloss, activeHigh
       )}
       {block.type === "figure" && block.src && <Picture src={block.src} alt={block.alt} />}
       {block.type === "media" && block.src && (block.kind === "audio" || block.kind === "video") ? (
-        <Media src={block.src} kind={block.kind} label={block.runs.length ? undefined : undefined} />
+        // The clip's own line of text keeps it addressable: notes anchor to it.
+        <span className="blk-text">
+          <span className="blk-media-label">{content}</span>
+          <Media src={block.src} kind={block.kind} />
+        </span>
       ) : block.type === "table" && block.rows ? (
         <Table rows={block.rows} head={block.head} />
       ) : block.type === "figure" ? (

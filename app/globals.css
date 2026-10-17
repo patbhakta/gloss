@@ -2003,3 +2003,6 @@ a.desk-tile:focus-visible {
 .note-bar-track { flex: 1; height: 4px; border-radius: 2px; background: rgba(60, 50, 30, 0.14); overflow: hidden; }
 .note-bar-fill { display: block; height: 100%; background: #b3261e; border-radius: 2px; }
 .note-bar-val { width: 30px; text-align: right; font-variant-numeric: tabular-nums; color: var(--ink-4); }
+
+/* The clip line: its label sits with the player, so the passage stays addressable. */
+.blk-media-label { display: block; margin-bottom: 4px; }
