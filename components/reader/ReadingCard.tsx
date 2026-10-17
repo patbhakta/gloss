@@ -23,7 +23,22 @@ export function ReadingCard({ note, clipSrc }: { note: string; clipSrc?: string 
   const rows = m
     ? [...m[1].matchAll(/([a-z ]+?)\s+(0\.\d+)/g)].map((x) => ({ label: x[1].trim(), value: Number(x[2]) }))
     : [];
-  if (!rows.length) return <span className="whitespace-pre-line">{note}</span>;
+  if (!rows.length) {
+    // A remembered moment with its own media: the words, and the clip right under them.
+    if (!clipSrc) return <span className="whitespace-pre-line">{note}</span>;
+    const video = /\.(mp4|webm|mov)$/i.test(clipSrc);
+    return (
+      <span className="note-card">
+        <span className="note-card-head">
+          <span className="note-card-kicker">Moment</span>
+        </span>
+        <span className="whitespace-pre-line">{note}</span>
+        <span className="note-card-clip">
+          {video ? <video controls playsInline preload="none" src={clipSrc} /> : <audio controls preload="none" src={clipSrc} />}
+        </span>
+      </span>
+    );
+  }
   return (
     <span className="note-card">
       <span className="note-card-head">

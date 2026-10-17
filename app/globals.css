@@ -2006,3 +2006,4 @@ a.desk-tile:focus-visible {
 
 /* The clip line: its label sits with the player, so the passage stays addressable. */
 .blk-media-label { display: block; margin-bottom: 4px; }
+.note-card-clip video { width: 100%; max-width: 240px; border-radius: 10px; display: block; margin-top: 6px; background: #000; }
