@@ -211,16 +211,13 @@ export const useStore = create<State>((set, get) => ({
     // truth on first open.
     if (!localStorage.getItem("gloss:docs:flushed")) {
       localStorage.setItem("gloss:docs:flushed", "1");
-      try {
-        const d = await idb();
-        await new Promise<void>((res) => {
-          const t = d.transaction(DOCS, "readwrite");
-          t.objectStore(DOCS).clear();
-          t.oncomplete = () => res();
-          t.onerror = () => res();
-          t.onabort = () => res();
-        });
-      } catch {}
+      idb().then((d) => new Promise<void>((res) => {
+        const t = d.transaction(DOCS, "readwrite");
+        t.objectStore(DOCS).clear();
+        t.oncomplete = () => res();
+        t.onerror = () => res();
+        t.onabort = () => res();
+      })).catch(() => {});
     }
     // A reload mid-answer leaves a dangling stream: mark it, never spin forever.
     const glosses = data.glosses ?? {};
