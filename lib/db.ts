@@ -142,6 +142,9 @@ export async function pushRows(userId: string, changes: Partial<Record<Collectio
 /** One article's full text. */
 export async function articleDoc(userId: string, id: string): Promise<unknown | null> {
   const rows = await db().query("select doc from articles where user_id = $1 and id = $2 and not deleted and doc is not null", [userId, id]);
+  // The doc is fetched by its row id; whatever the doc says about itself is
+  // corrected here, so notes and shelves always key on the same identity.
+  if (rows.length && rows[0].doc && typeof rows[0].doc === "object") rows[0].doc.id = id;
   return rows.length ? rows[0].doc : null;
 }
 
