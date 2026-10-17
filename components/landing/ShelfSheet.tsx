@@ -6,7 +6,24 @@ import { createPortal } from "react-dom";
 import { Check, Download, PencilLine, Search, X } from "lucide-react";
 import { readingMinutes, tidyTitle } from "@/lib/article";
 import { exportAll } from "@/lib/export";
-import { useStore, type Highlight } from "@/lib/store";
+import { loadDoc, useStore, type Highlight } from "@/lib/store";
+import { ReadingCard } from "@/components/reader/ReadingCard";
+
+/** The clip for an anchored note, read from the cached text when the reading page is not open. */
+function useClipSrc(articleId: string, blockId?: string): string | undefined {
+  const [src, setSrc] = useState<string>();
+  useEffect(() => {
+    let alive = true;
+    if (!blockId) return;
+    loadDoc(articleId).then((doc) => {
+      if (!alive || !doc) return;
+      const b = doc.blocks.find((x) => x.id === blockId);
+      setSrc(b?.src ?? undefined);
+    });
+    return () => { alive = false; };
+  }, [articleId, blockId]);
+  return src;
+}
 /** One text in the sheet: a shelf entry or a sample, with how far it has been read. */
 export type ShelfItem = {
   id: string;
@@ -396,6 +413,7 @@ function RenameRow({ title, onDone }: { title: string; onDone: (title: string | 
 
 /** One highlight on the shelf: the marked words, the reader's note under them, and where they are from. */
 function HighlightRow({ h, i, title, onOpen }: { h: Highlight; i: number; title: string; onOpen: () => void }) {
+  const clipSrc = useClipSrc(h.articleId, h.anchor?.start?.b);
   return (
     <li className="shelf-row" style={{ animationDelay: `${Math.min(i, 14) * 18}ms` }}>
       <a
@@ -413,7 +431,11 @@ function HighlightRow({ h, i, title, onOpen }: { h: Highlight; i: number; title:
             {h.anchor.quote}
           </mark>
         </span>
-        {h.note && <span className="mt-2 block max-w-[64ch] whitespace-pre-line text-[14px] leading-[1.55] text-ink-2">{h.note}</span>}
+        {h.note && (
+          <span className="mt-2 block max-w-[64ch] text-[14px] leading-[1.55] text-ink-2">
+            <ReadingCard note={h.note} clipSrc={clipSrc} />
+          </span>
+        )}
         <span className="mt-2 block truncate text-[12.5px] text-ink-3">{tidyTitle(title)}</span>
       </a>
     </li>
