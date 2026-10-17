@@ -4,12 +4,14 @@ import { texToText } from "./tex";
 
 export type Run = { text: string; em?: boolean; strong?: boolean; code?: boolean; href?: string };
 
-export type BlockType = "p" | "h2" | "h3" | "quote" | "li" | "pre" | "note" | "figure" | "table";
+export type BlockType = "p" | "h2" | "h3" | "quote" | "li" | "pre" | "note" | "figure" | "table" | "media";
 
 /**
  * Figures carry an image by its original URL (never a copy), with the caption
  * as their runs. Tables carry their cells; their runs are empty, so nothing in
  * a table can be anchored, but the model still reads it (see modelText).
+ * Media blocks carry a playable clip (audio or video) by URL — limbic memory
+ * material — with their runs as an optional caption.
  */
 export type Block = {
   id: string;
@@ -19,9 +21,31 @@ export type Block = {
   alt?: string;
   rows?: string[][];
   head?: boolean;
+  /** For media blocks: audio | video. */
+  kind?: "audio" | "video";
   /** The PDF page it came from, so one page can be read again and swapped in alone. */
   page?: number;
 };
+
+/** Media a limbic text can carry, matched by extension. */
+const AUDIO = /\.(mp3|m4a|aac|wav|ogg)(?=([?#].*)?$)/i;
+const VIDEO = /\.(mp4|webm|mov|m4v)(?=([?#].*)?$)/i;
+const IMAGE = /\.(png|jpe?g|gif|webp|avif|svg)(?=([?#].*)?$)/i;
+
+/** The media URL a markdown chunk is (or holds), if it is media. */
+export function mediaOf(chunk: string): { src: string; kind: "audio" | "video" | "image"; label?: string }[] {
+  const out: { src: string; kind: "audio" | "video" | "image"; label?: string }[] = [];
+  // [label](url) or ![](url) or a bare URL, http(s) or root-relative
+  const re = /!?\[([^\]]*)\]\(((?:https?:\/\/|\/)[^)\s]+)\)|(?:^|\s)((?:https?:\/\/|\/)[^\s)]+\.(?:mp3|m4a|aac|wav|ogg|mp4|webm|mov|m4v|png|jpe?g|gif|webp|avif|svg))(?=[?#]?.*?(?:\s|$))/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(chunk))) {
+    const src = m[2] ?? m[3];
+    if (!src) continue;
+    const kind = AUDIO.test(src) ? "audio" : VIDEO.test(src) ? "video" : IMAGE.test(src) ? "image" : null;
+    if (kind) out.push({ src, kind, label: m[1] || undefined });
+  }
+  return out;
+}
 
 export type Article = {
   id: string;
@@ -207,6 +231,21 @@ function parseMarkdown(input: string, opts: { title?: string; takeTitle: boolean
       blocks.push({ ...table, id: id() });
       continue;
     }
+    // A chunk that is only media (links or bare URLs) becomes playable media
+    // blocks: audio, video, and images — limbic memory material.
+    {
+      const media = mediaOf(chunk);
+      const stripped = media.length
+        ? chunk.replace(/!?\[([^\]]*)\]\(([^)\s]+)\)|(?:https?:\/\/|\/)[^\s)]+/gi, "").replace(/\s+/g, "").length === 0
+        : false;
+      if (stripped && media.length) {
+        for (const md of media) {
+          if (md.kind === "image") blocks.push({ id: id(), type: "figure", runs: [], src: md.src, alt: md.label ?? "" });
+          else blocks.push({ id: id(), type: "media", kind: md.kind, runs: md.label ? inlineMd(md.label) : [], src: md.src });
+        }
+        continue;
+      }
+    }
     if (/^([-*+]|\d+\.)\s+/.test(chunk)) {
       for (const line of chunk.split("\n")) {
         const t = line.replace(/^\s*([-*+]|\d+\.)\s+/, "").trim();
@@ -253,7 +292,7 @@ export function inlineMd(input: string): Run[] {
   // Escaped characters are set aside first, so \\* never opens emphasis, then restored.
   const s = withMaths.replace(/\\([\\`*_{}\[\]()#+\-.!|~<>$%&])/g, (_, c: string) => String.fromCharCode(0xe000 + c.charCodeAt(0)));
   const runs: Run[] = [];
-  const re = /(\*\*([^*]+)\*\*)|(\*([^*]+)\*)|(_([^_]+)_)|(`([^`]+)`)|(\[([^\]]+)\]\((https?:[^)]+)\))/g;
+  const re = /(\*\*([^*]+)\*\*)|(\*([^*]+)\*)|(_([^_]+)_)|(`([^`]+)`)|(\[([^\]]+)\]\(((?:https?:\/\/|\/)[^)\s]+)\))/g;
   let last = 0;
   let m: RegExpExecArray | null;
   while ((m = re.exec(s))) {

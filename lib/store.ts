@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import type { Action } from "./actions";
 import type { Article, BriefData } from "./article";
+import { limbicId } from "./clerk-client-shim";
 import { modelOf, type ModelKey, type Source, type Usage } from "./models";
 import { DEFAULT_SETTINGS, SETTINGS_KEY, type Marker, type Settings } from "./settings";
 
@@ -148,7 +149,12 @@ type State = Persisted &
     applyRemote: (c: RemoteChanges) => void;
   };
 
-const KEY = "gloss:v1";
+/**
+ * bhakta.us: local state is per-limbic — one brain must never read another's
+ * shelf, highlights or notes in a shared browser. The key carries the active
+ * limbic; switching limbics reloads, which re-hydrates from the other key.
+ */
+const KEY = `gloss:v1:${limbicId()}`;
 const DOC_PREFIX = "gloss:doc:";
 
 
@@ -180,6 +186,16 @@ export const useStore = create<State>((set, get) => ({
     let data: Partial<Persisted> = {};
     let settings: Partial<Settings> = {};
     try {
+      // bhakta.us migration: the pre-limbic shared shelf becomes Pat's, minus
+      // the Chandler chapters that were once shelved to him by mistake — those
+      // are dropped here and pushed as tombstones, so every device cleans up.
+      if (!localStorage.getItem(KEY) && localStorage.getItem("gloss:v1")) {
+        try {
+          const old = JSON.parse(localStorage.getItem("gloss:v1") || "{}") as Partial<Persisted>;
+          old.library = (old.library ?? []).filter((x) => !/^Chandler\b/i.test(String(x.title ?? "")));
+          localStorage.setItem(KEY, JSON.stringify(old));
+        } catch {}
+      }
       data = JSON.parse(localStorage.getItem(KEY) || "{}");
       settings = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}");
     } catch {}

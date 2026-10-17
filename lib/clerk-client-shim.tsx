@@ -15,9 +15,14 @@ export const LOCAL_USER = {
 /** The persona labels that match lib/clerk-shim LIMBICS server-side. */
 const LIMBIC_LABELS: Record<string, string> = { pat: "Pat", chandler: "Chandler" };
 
+/** The active limbic id, from the same `limbic` cookie the server shim reads. */
+export function limbicId(): string {
+  return (typeof document !== "undefined" && document.cookie.split("; ").find((c) => c.startsWith("limbic="))?.slice(7)) || "pat";
+}
+
 /** The active limbic, from the same `limbic` cookie the server shim reads. */
 function limbicUser() {
-  const id = (typeof document !== "undefined" && document.cookie.split("; ").find((c) => c.startsWith("limbic="))?.slice(7)) || "pat";
+  const id = limbicId();
   const label = LIMBIC_LABELS[id] ?? "Pat";
   return { id, firstName: label, fullName: label, imageUrl: "" };
 }

@@ -2,7 +2,7 @@
 
 import { memo, useState, type ReactNode } from "react";
 import { MessageCirclePlus } from "lucide-react";
-import type { Block as BlockT, Run } from "@/lib/article";
+import { mediaOf, type Block as BlockT, type Run } from "@/lib/article";
 
 /** `note`: a highlight with the reader's note, set only in the block where it ends. */
 export type Mark = { from: number; to: number; kind: "gloss" | "hl" | "pending"; id: string; color?: string; note?: boolean };
@@ -168,6 +168,35 @@ function Table({ rows, head }: { rows: string[][]; head?: boolean }) {
   );
 }
 
+/** A playable clip from a limbic text: audio renders compact, video inline. */
+function Media({ src, kind, label }: { src: string; kind: "audio" | "video"; label?: string }) {
+  return (
+    <span className="blk-media">
+      {kind === "audio" ? (
+        <audio controls preload="none" src={src} />
+      ) : (
+        <video controls preload="metadata" playsInline src={src} className="media-video" />
+      )}
+      {label && <span className="media-label">{label}</span>}
+    </span>
+  );
+}
+
+/**
+ * Texts saved before media blocks existed store clip links as literal text
+ * (`[▶ clip](/media/…)`, unparsed). When a paragraph is nothing else, show
+ * the players instead of the markdown.
+ */
+function legacyMedia(block: BlockT): { src: string; kind: "audio" | "video"; label?: string }[] | null {
+  if (block.type !== "p") return null;
+  const text = block.runs.map((r) => r.text).join("");
+  const media = mediaOf(text);
+  if (!media.length) return null;
+  const without = text.replace(/!?\[[^\]]*\]\([^)\s]+\)|(?:https?:\/\/|\/)[^\s)]+/gi, "").replace(/\s+/g, "");
+  const av = media.filter((m): m is { src: string; kind: "audio" | "video"; label?: string } => m.kind === "audio" || m.kind === "video");
+  return without.length === 0 && av.length ? av : null;
+}
+
 function BlockImpl({ block, n, first, marks, activeGloss, hoverGloss, activeHighlight, fresh, cursor, hasAt, onAsk }: Props) {
   const Tag = block.type === "h2" ? "h2" : block.type === "h3" ? "h3" : block.type === "figure" ? "figure" : "div";
   const content = segments(block, marks, activeGloss, hoverGloss, activeHighlight, fresh);
@@ -195,10 +224,18 @@ function BlockImpl({ block, n, first, marks, activeGloss, hoverGloss, activeHigh
         </button>
       )}
       {block.type === "figure" && block.src && <Picture src={block.src} alt={block.alt} />}
-      {block.type === "table" && block.rows ? (
+      {block.type === "media" && block.src && (block.kind === "audio" || block.kind === "video") ? (
+        <Media src={block.src} kind={block.kind} label={block.runs.length ? undefined : undefined} />
+      ) : block.type === "table" && block.rows ? (
         <Table rows={block.rows} head={block.head} />
       ) : block.type === "figure" ? (
         block.runs.length > 0 && <figcaption className="blk-text">{content}</figcaption>
+      ) : legacyMedia(block) ? (
+        <span className="blk-text">
+          {legacyMedia(block)!.map((m, i) => (
+            <Media key={i} src={m.src} kind={m.kind} label={m.label} />
+          ))}
+        </span>
       ) : (
         <span className="blk-text">{content}</span>
       )}

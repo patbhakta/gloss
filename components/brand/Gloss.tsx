@@ -1,34 +1,56 @@
 import Link from "next/link";
 
 /**
- * bhakta.us: Huible wordmark. Upstream was "Gloss" + a together.ai maker link;
- * we brand the fork with Huible in EB Garamond (the Huible site face) and drop
- * the third-party lockup entirely.
+ * bhakta.us: Huible brand — the official brain-and-infinity-bulb mark
+ * (HUibleSVG from Pat, Oct 17) beside the wordmark in Playfair Display
+ * Italic. Geometry is inline so it inherits currentColor.
  */
 
-/** Lines of text with a note in the margin: the whole idea in 24px. */
+/** The official brain-and-infinity-bulb mark. */
 export function GlossMark({ className = "size-6" }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden className={className}>
-      <path d="M3 6.5h10.5M3 11.5h10.5M3 16.5h6.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-      <path d="M18.5 3v18" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" opacity="0.32" />
-      <circle cx="18.5" cy="11.5" r="2.9" fill="var(--rubric)" />
+    <svg viewBox="16 18 864 1138" fill="none" aria-hidden className={className}>
+      <clipPath id="screw-silhouette" clipPathUnits="userSpaceOnUse">
+        <path d="M288 894 H608 L563 1068 C548 1109 498 1134 448 1134 C398 1134 348 1109 333 1068 Z"/>
+      </clipPath>
+      <g id="brain-and-glass" fill="none" stroke="currentColor" stroke-width="36" stroke-linecap="round" stroke-linejoin="round">
+    <g id="brain-left">
+      <path id="left-crown-and-stem" d="M424 442 V148 C424 104 392 70 346 70 C284 70 239 109 239 164 C239 205 261 235 295 235 C317 235 333 220 333 201 C333 185 324 175 312 179"/>
+      <path id="left-upper-fold" d="M237 152 C180 156 148 194 147 242 C146 289 178 326 220 326 H279 C338 326 347 324 377 374"/>
+      <path id="left-glass-outline" d="M145 254 C89 285 67 329 67 398 C67 542 94 610 173 690 C223 741 266 817 297 865"/>
+      <path id="left-outer-lower-fold" d="M68 428 C91 490 127 516 165 516 C207 516 239 516 255 468"/>
+      <path id="left-inner-lower-fold" d="M205 404 C220 450 263 480 309 480 C351 480 375 460 375 428"/>
+    </g>
+    <use id="brain-right" href="#brain-left" transform="translate(896 0) scale(-1 1)"/>
+  </g>
+  <path id="infinity" fill="none" stroke="currentColor" stroke-width="36" stroke-linecap="round" stroke-linejoin="round" d="M448 640 C407 614 371 578 336 578 C293 578 260 604 260 640 C260 676 293 702 336 702 C371 702 407 666 448 640 C489 614 525 578 560 578 C603 578 636 604 636 640 C636 676 603 702 560 702 C525 702 489 666 448 640 Z"/>
+  <g id="filament-supports" fill="none" stroke="currentColor" stroke-width="18" stroke-linecap="round">
+    <path id="left-support" d="M423 902 C414 839 434 779 406 739"/>
+    <path id="right-support" d="M473 902 C482 839 462 779 490 739"/>
+  </g>
+  <g id="screw-base" fill="#28221e" clip-path="url(#screw-silhouette)">
+    <path id="top-thread" d="M200 894 H700 V898 L200 988 Z"/>
+    <path id="middle-thread" d="M200 1003 L700 913 V953 L200 1043 Z"/>
+    <path id="lower-thread" d="M200 1058 L700 968 V1008 L200 1098 Z"/>
+    <path id="bottom-contact" d="M200 1113 L700 1023 V1063 L200 1153 Z"/>
+  </g>
     </svg>
   );
 }
 
-/** The wordmark, set in the Huible New York serif (Pat directive Oct 17). */
+/** The wordmark: official mark + Huible in Playfair Display Italic. */
 export function GlossWordmark() {
   return (
-    <span className="flex h-9 items-center text-ink">
-      <span className="ny-wordmark block translate-y-[2px] text-[21px] font-normal leading-[21px] tracking-[-0.012em]">
+    <span className="flex h-9 items-center gap-[7px] text-ink">
+      <GlossMark className="h-[24px] w-[18px] shrink-0" />
+      <span className="ny-wordmark block translate-y-[1px] text-[21px] leading-[21px] tracking-[-0.012em]">
         Huible
       </span>
     </span>
   );
 }
 
-/** The app's mark. Logo click returns to the reader's library. */
+/** Top bar lockup: the wordmark, linked back to the limbic shelf. */
 export function Lockup({ href = "/library" }: { href?: string }) {
   return (
     <div className="flex h-9 items-center gap-3.5 max-[380px]:gap-2.5">
