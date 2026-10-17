@@ -15,11 +15,17 @@ function useClipSrc(articleId: string, blockId?: string): string | undefined {
   useEffect(() => {
     let alive = true;
     if (!blockId) return;
-    loadDoc(articleId).then((doc) => {
+    (async () => {
+      let doc = await loadDoc(articleId);
+      if (!doc) {
+        const res = await fetch(`/api/articles/${articleId}`);
+        if (!res.ok) return;
+        doc = (await res.json()).doc;
+      }
       if (!alive || !doc) return;
-      const b = doc.blocks.find((x) => x.id === blockId);
+      const b = doc.blocks?.find((x) => x.id === blockId);
       setSrc(b?.src ?? undefined);
-    });
+    })();
     return () => { alive = false; };
   }, [articleId, blockId]);
   return src;
