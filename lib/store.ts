@@ -206,6 +206,22 @@ export const useStore = create<State>((set, get) => ({
       data = JSON.parse(localStorage.getItem(KEY) || "{}");
       settings = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}");
     } catch {}
+    // v2 purge companion: localStorage was reset, but IndexedDB kept whole texts
+    // from the ghost era. One-time flush so every doc is re-fetched from server
+    // truth on first open.
+    if (!localStorage.getItem("gloss:docs:flushed")) {
+      localStorage.setItem("gloss:docs:flushed", "1");
+      try {
+        const d = await idb();
+        await new Promise<void>((res) => {
+          const t = d.transaction(DOCS, "readwrite");
+          t.objectStore(DOCS).clear();
+          t.oncomplete = () => res();
+          t.onerror = () => res();
+          t.onabort = () => res();
+        });
+      } catch {}
+    }
     // A reload mid-answer leaves a dangling stream: mark it, never spin forever.
     const glosses = data.glosses ?? {};
     for (const list of Object.values(glosses)) {
