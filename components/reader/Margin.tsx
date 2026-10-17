@@ -225,7 +225,7 @@ const NoteCard = forwardRef<HTMLButtonElement, { note: Highlight; articleEl: HTM
       : [];
     const clipSrc =
       note.anchor?.start?.b && articleEl
-        ? articleEl.querySelector(`[data-b="${note.anchor.start.b}"] audio, [data-b="${note.anchor.start.b}"] video`)?.getAttribute("src") ?? undefined
+        ? articleEl.querySelector(`[data-block="${note.anchor.start.b}"] audio, [data-block="${note.anchor.start.b}"] video`)?.getAttribute("src") ?? undefined
         : undefined;
     return (
       <button
