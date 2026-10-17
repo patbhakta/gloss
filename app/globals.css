@@ -1985,3 +1985,21 @@ a.desk-tile:focus-visible {
 .blk-media audio { height: 34px; max-width: 340px; }
 .media-video { display: block; width: 100%; max-width: 560px; border-radius: 8px; margin: 4px 0 10px; }
 .media-label { font-size: 12px; color: var(--ink-3); }
+
+/* Margin reading cards: vault machine readings as small polaroids —
+   top feeling with its score, quiet bars for the rest, clip playable inside. */
+.mnote.is-card { padding: 10px 12px 11px; background: #f8f3e7; border: 1px solid #e4dcc8; border-radius: 3px; box-shadow: 1.5px 2.5px 0 rgba(60, 50, 30, 0.12); width: 100%; text-align: left; }
+.mnote.is-card:hover { box-shadow: 2px 4px 0 rgba(60, 50, 30, 0.18); }
+.note-card { display: block; }
+.note-card-head { display: flex; flex-direction: column; gap: 2px; }
+.note-card-kicker { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-4); }
+.note-card-top { font-size: 14.5px; font-family: var(--font-serif); color: #b3261e; }
+.note-card-top b { font-size: 17px; }
+.note-card-clip { display: block; margin: 8px 0 7px; }
+.note-card-clip audio { height: 30px; width: 100%; }
+.note-card-bars { display: flex; flex-direction: column; gap: 3.5px; }
+.note-bar { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--ink-3); }
+.note-bar-label { width: 34%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.note-bar-track { flex: 1; height: 4px; border-radius: 2px; background: rgba(60, 50, 30, 0.14); overflow: hidden; }
+.note-bar-fill { display: block; height: 100%; background: #b3261e; border-radius: 2px; }
+.note-bar-val { width: 30px; text-align: right; font-variant-numeric: tabular-nums; color: var(--ink-4); }

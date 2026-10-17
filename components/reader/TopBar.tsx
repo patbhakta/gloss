@@ -129,8 +129,8 @@ export function TopBar({ currentN, pastTitle, listenFrom }: { currentN: number |
             className={`${barBtn} !px-3 ${notebookOpen ? "bg-sunk text-ink" : ""}`}
             onClick={() => setUI({ notebookOpen: !notebookOpen })}
             aria-pressed={notebookOpen}
-            aria-label="Memory"
-            data-tip={notebookOpen ? "Close memory" : "Memory"}
+            aria-label="Diary"
+            data-tip={notebookOpen ? "Close diary" : "Diary"}
             data-tip-kbd="N"
           >
             <NotebookPen size={16} strokeWidth={1.8} />
