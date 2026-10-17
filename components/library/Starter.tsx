@@ -36,7 +36,7 @@ export function Starter({ count, signedIn, onAdd }: { count: number; signedIn: b
   };
 
   return (
-    <section className="starter" aria-label="Fill your library">
+    <section className="starter" aria-label="Fill your limbic">
       <div className="starter-card is-classics">
         <div className="starter-fan" aria-hidden>
           {CLASSICS.slice(0, 5).map((c, i) => (

@@ -36,7 +36,7 @@ export function AddPanel({ tab, onTab, onClose, signedIn }: { tab: AddTab; onTab
   return createPortal(
     <div className="fixed inset-0 z-[80]" role="presentation">
       <div className="absolute inset-0 bg-ink/20 backdrop-blur-[2px]" style={{ animation: "fade 0.2s both" }} onClick={onClose} />
-      <section role="dialog" aria-modal aria-label="Add to the library" className="add-panel">
+      <section role="dialog" aria-modal aria-label="Add to the limbic" className="add-panel">
         <header className="flex items-center justify-between gap-3">
           <div className="lib-sort !ml-0" role="tablist" aria-label="Add">
             <button type="button" role="tab" aria-selected={tab === "agent"} aria-checked={tab === "agent"} onClick={() => onTab("agent")}>
@@ -145,7 +145,7 @@ function Links() {
 
   return (
     <div className="mt-5">
-      <p className="text-[19px] font-serif leading-tight text-ink">Save links to your library</p>
+      <p className="text-[19px] font-serif leading-tight text-ink">Save links to your limbic</p>
       <p className="mt-1 text-[13px] text-ink-3">
         One or many, a line each. Gloss reads each page in and sorts it onto a topic. PDFs work too. Leaving Pocket, Instapaper or Raindrop?{" "}
         <button type="button" onClick={() => fileRef.current?.click()} className="text-ink-2 underline decoration-rule-strong underline-offset-2 hover:text-ink">
@@ -291,7 +291,7 @@ function Agent({ signedIn }: { signedIn: boolean }) {
     return (
       <div className="mt-5">
         <AgentIntro />
-        <p className="mt-4 text-[13.5px] text-ink-2">An agent saves to the library in your account, so it needs you signed in.</p>
+        <p className="mt-4 text-[13.5px] text-ink-2">An agent saves to the limbic in your account, so it needs you signed in.</p>
         <SignInButton mode="modal">
           <button type="button" className="add-btn mt-4">
             Sign in to connect
@@ -387,7 +387,7 @@ function Setup({ token, label, origin }: { token: string; label: string; origin:
         ]
       : label === "Claude"
         ? [
-            { title: "Claude Code: run this", body: "Then ask Claude to save something to your Gloss library.", copy: `claude mcp add --transport http gloss ${url} --header "Authorization: Bearer ${token}"` },
+            { title: "Claude Code: run this", body: "Then ask Claude to save something to your limbic.", copy: `claude mcp add --transport http gloss ${url} --header "Authorization: Bearer ${token}"` },
             { title: "Or claude.ai: Settings, Connectors, Add custom connector", body: "This link carries your token, so keep it private.", copy: `${url}/${token}` },
           ]
         : [

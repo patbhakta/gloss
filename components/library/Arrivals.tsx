@@ -70,11 +70,11 @@ export function Arrivals({
           {who ? (
             wave.done ? (
               <>
-                <b>{who}</b> added {n} {noun} to your library
+                <b>{who}</b> added {n} {noun} to your limbic
               </>
             ) : (
               <>
-                <b>{who}</b> is adding articles to your library
+                <b>{who}</b> is adding articles to your limbic
               </>
             )
           ) : wave.done ? (
@@ -82,7 +82,7 @@ export function Arrivals({
               <b>{n}</b> new {noun} on your shelves
             </>
           ) : (
-            <>Adding to your library</>
+            <>Adding to your limbic</>
           )}
         </p>
         {!wave.done && <span className="arr-count tabular-nums">{n}</span>}

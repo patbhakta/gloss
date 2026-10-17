@@ -250,7 +250,7 @@ export function Library() {
   const searchBox = (
     <label className="lib-search">
       <Search size={15} className="shrink-0 text-ink-4" aria-hidden />
-      <input ref={searchRef} value={q} onChange={(e) => setQ(e.target.value)} placeholder={T ? `Search ${T.name}` : "Search the library"} aria-label="Search the library" />
+      <input ref={searchRef} value={q} onChange={(e) => setQ(e.target.value)} placeholder={T ? `Search ${T.name}` : "Search the limbic"} aria-label="Search the limbic" />
       {q ? (
         <button type="button" aria-label="Clear search" onClick={() => setQ("")} className="grid size-5 place-items-center rounded-full text-ink-3 hover:bg-sunk">
           <X size={13} />
@@ -283,7 +283,7 @@ export function Library() {
           <section className="lib-hero">
             <div className="lib-hero-row">
               <div className="min-w-0">
-                <h1 className="lib-title">{first ? `${first}'s library` : "Your library"}</h1>
+                <h1 className="lib-title">{first ? `${first}'s limbic` : "Your limbic"}</h1>
                 {/* Its height is kept while the shelf is read, so the tools below never jump. */}
                 <p className="lib-stats">
                   {hydrated && (

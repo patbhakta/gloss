@@ -230,8 +230,8 @@ export function BookOpen({
                     <button
                       type="button"
                       className="ob-icon"
-                      aria-label={book.sample ? "Remove this sample" : "Remove from the library"}
-                      data-tip={book.sample ? "Remove this sample" : "Remove from the library"}
+                      aria-label={book.sample ? "Remove this sample" : "Remove from the limbic"}
+                      data-tip={book.sample ? "Remove this sample" : "Remove from the limbic"}
                       onClick={() => onRemove(book)}
                     >
                       <Trash2 size={14} />
