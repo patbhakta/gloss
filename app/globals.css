@@ -16,16 +16,17 @@
   src: url("/fonts/eb-garamond-italic-variable.woff2") format("woff2");
 }
 
-/* Huible wordmark — New York serif (Pat directive Oct 17). */
+/* Huible wordmark — Playfair Display Italic (the beta.huible.com face, from Pat). */
 @font-face {
-  font-family: "New York";
-  font-style: normal;
-  font-weight: 400;
+  font-family: "Playfair Display";
+  font-style: italic;
+  font-weight: 400 900;
   font-display: swap;
-  src: url("/fonts/newyork.woff2") format("woff2");
+  src: url("/fonts/playfair-display-italic-variable.woff2") format("woff2");
 }
 .ny-wordmark {
-  font-family: "New York", "EB Garamond", Georgia, serif !important;
+  font-family: "Playfair Display", "EB Garamond", Georgia, serif !important;
+  font-style: italic !important;
 }
 
 /* ==========================================================================
