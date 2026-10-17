@@ -552,9 +552,6 @@ function ReaderInner({ article }: { article: Article }) {
               </div>
 
               <footer className="focus-hide mt-16 border-t border-rule pt-10 text-[13.5px] leading-relaxed text-ink-3">
-                <p aria-hidden className="mb-8 text-center font-serif text-[26px] leading-none text-[var(--rubric)]">
-                  ❦
-                </p>
                 {article.source && <p>From {article.source}.</p>}
                 <div className="mt-6 flex flex-wrap gap-2">
                   <button type="button" onClick={() => setUI({ notebookOpen: true })} className="h-9 rounded-full border border-rule px-4 text-[13px] font-medium text-ink-2 hover:border-rule-strong hover:text-ink">
