@@ -203,7 +203,7 @@ async function saveArticles(userId: string, args: Record<string, unknown>, via: 
     if (kind === "social") return { url, status: "failed", reason: "This is a social post, not an article. Send the link the post points to, or, if the post is the piece, read it and send its text with save_text." };
     if (kind === "video") return { url, status: "failed", reason: "This is a video, not an article. Gloss reads text: send its transcript with save_text." };
     const known = have.get(key);
-    if (known) return { url, status: "already_saved", title: String(known.data.title ?? ""), topic: topicMeta(known.data.topic).name };
+    if (known) return { url, status: "already_saved", title: String(known.data.title ?? ""), topic: topicMeta(typeof known.data.topic === "string" ? known.data.topic : "unsorted").name };
     if (budget <= 0) return { url, status: "failed", reason: `The daily limit of ${PER_DAY} saves is reached. Try again tomorrow.` };
     budget--;
 
@@ -297,7 +297,7 @@ async function saveText(userId: string, args: Record<string, unknown>, via: stri
 
   const item = shelfItem(a, { ...(await sortOf(userId, a)), via });
   await shelveForUser(userId, item, a);
-  const topic = topicMeta(item.topic).name;
+  const topic = topicMeta(item.topic ?? "unsorted").name;
   return toolResult(`Saved: ${a.title} (${topic}, ${item.words.toLocaleString("en-US")} words)\n\nIt'll be on the shelves at ${SITE}/library.`, {
     status: "saved",
     title: a.title,
