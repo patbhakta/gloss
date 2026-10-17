@@ -10,6 +10,7 @@ import { stopGloss } from "@/lib/ask";
 import { useGlosses, useHighlights, useStore, type Gloss, type Highlight, type Turn } from "@/lib/store";
 import { ACTIONS } from "@/lib/actions";
 import { notesMarkdown, pairsOf } from "@/lib/export";
+import { ReadingCard, clipSrcFor } from "./ReadingCard";
 import { Answer, Sources } from "./Answer";
 import { Writing } from "./Writing";
 import { useReader } from "./context";
@@ -313,7 +314,11 @@ function HighlightEntry({ h }: { h: Highlight }) {
             {h.anchor.quote}
           </mark>
         </span>
-        {h.note && <span className="mt-2.5 block whitespace-pre-line text-[14px] leading-[1.55] text-ink-2">{h.note}</span>}
+        {h.note && (
+          <span className="mt-2.5 block text-[14px] leading-[1.55] text-ink-2">
+            <ReadingCard note={h.note} clipSrc={clipSrcFor(h.anchor.start.b)} />
+          </span>
+        )}
       </button>
       <button
         type="button"

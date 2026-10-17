@@ -5,6 +5,7 @@ import { anchorToRange, blockEl } from "@/lib/anchor";
 import { MARKERS } from "@/lib/settings";
 import { useStore, type Gloss, type Highlight } from "@/lib/store";
 import { GlossCard, marginStyle } from "./GlossCard";
+import { ReadingCard, clipSrcFor } from "./ReadingCard";
 
 /** Room between notes; one-line notes in a crowded stretch sit close, like a list. */
 const GAP = 16;
@@ -209,71 +210,23 @@ export function Margin({
   );
 }
 
-/** A reading from the vaults: "Voice reading (prosody): sadness 0.44, joy 0.21, …" */
-const PROSODY = /^Voice reading \(prosody\):\s*(.+)$/;
-
-/**
- * A margin note. Machine readings from the vaults become small polaroid
- * cards — top feeling with its score, the rest as quiet bars, and the clip
- * itself playable right here in the margin.
- */
 const NoteCard = forwardRef<HTMLButtonElement, { note: Highlight; articleEl: HTMLElement | null; top?: number; fresh: boolean; active: boolean; onOpen: () => void }>(
-  function NoteCard({ note, articleEl, top, fresh, active, onOpen }, ref) {
-    const m = note.note?.match(PROSODY);
-    const rows = m
-      ? [...m[1].matchAll(/([a-z ]+?)\s+(0\.\d+)/g)].map((x) => ({ label: x[1].trim(), value: Number(x[2]) }))
-      : [];
-    const clipSrc =
-      note.anchor?.start?.b && articleEl
-        ? articleEl.querySelector(`[data-block="${note.anchor.start.b}"] audio, [data-block="${note.anchor.start.b}"] video`)?.getAttribute("src") ?? undefined
-        : undefined;
+  function NoteCard({ note, top, fresh, active, onOpen }, ref) {
+    const isCard = /^Voice reading \(prosody\):/.test(note.note ?? "");
     return (
       <button
         ref={ref}
         type="button"
         onClick={onOpen}
-        className={`mnote${active ? " is-active" : ""}${m ? " is-card" : ""}`}
+        className={`mnote${active ? " is-active" : ""}${isCard ? " is-card" : ""}`}
         style={{ ...marginStyle(top, fresh), ["--note-c" as string]: MARKERS.find((mk) => mk.key === (note.color ?? "yellow"))?.color }}
         aria-label={`Your note: ${note.note}. Edit note.`}
       >
-        {rows.length ? (
-          <span className="note-card">
-            <span className="note-card-head">
-              <span className="note-card-kicker">Voice reading</span>
-              {rows[0] && (
-                <span className="note-card-top">
-                  {cap(rows[0].label)} <b>{Math.round(rows[0].value * 100)}%</b>
-                </span>
-              )}
-            </span>
-            {clipSrc && (
-              <span className="note-card-clip">
-                <audio controls preload="none" src={clipSrc} />
-              </span>
-            )}
-            {rows.length > 1 && (
-              <span className="note-card-bars">
-                {rows.slice(1).map((r) => (
-                  <span key={r.label} className="note-bar">
-                    <span className="note-bar-label">{r.label}</span>
-                    <span className="note-bar-track">
-                      <span className="note-bar-fill" style={{ width: `${Math.round(r.value * 100)}%` }} />
-                    </span>
-                    <span className="note-bar-val">{Math.round(r.value * 100)}%</span>
-                  </span>
-                ))}
-              </span>
-            )}
-          </span>
-        ) : (
-          <span className="line-clamp-4 whitespace-pre-line">{note.note}</span>
-        )}
+        <ReadingCard note={note.note ?? ""} clipSrc={clipSrcFor(note.anchor?.start?.b)} />
       </button>
     );
   }
 );
-
-const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 function EmptyMargin({ top }: { top: number }) {
   return (
