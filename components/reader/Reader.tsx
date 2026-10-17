@@ -205,8 +205,18 @@ function ReaderInner({ article }: { article: Article }) {
   const notes = useMemo(() => highlights.filter((h) => h.note), [highlights]);
   const openNote = useCallback((h: { id: string; anchor: Anchor }) => setOpenHl({ id: h.id, anchor: h.anchor, at: Date.now(), note: true }), []);
   const atBlocks = useMemo(() => new Set(glosses.filter((g) => !g.anchor && g.at).map((g) => g.at!)), [glosses]);
-  // The drop cap goes on the first real paragraph, not a one-line caption or credit.
-  const firstPara = useMemo(() => article.blocks.find((b) => b.type === "p" && (ix.texts.get(b.id)?.length ?? 0) >= 180)?.id, [article.blocks, ix]);
+  // The drop cap goes on the first line of dialog: the first person to speak.
+  // Scene headers ("[Scene: ...]") and stage directions ("(they enter)") never
+  // open a skit, no matter how long or short the spoken line is.
+  const firstPara = useMemo(
+    () =>
+      article.blocks.find((b) => {
+        if (b.type !== "p") return false;
+        const t = (ix.texts.get(b.id) ?? "").trim();
+        return t.length >= 3 && !t.startsWith("[") && !t.startsWith("(");
+      })?.id,
+    [article.blocks, ix]
+  );
 
   const onAskBlock = useCallback(
     (blockId: string) => {
