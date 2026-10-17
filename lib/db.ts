@@ -98,7 +98,7 @@ export async function pullRows(userId: string, since: string): Promise<{ now: st
 }
 
 /** Upsert every collection's rows in one transaction. The server stamps the time, so the latest write wins. */
-export async function pushRows(userId: string, changes: Partial<Record<Collection, PushRow[]>>): Promise<void> {
+export async function pushRows(userId: string, changes: Partial<Record<Collection, PushRow[]>>): Promise<Partial<Record<Collection, string[]>>> {
   const sql = db();
   const queries = Object.entries(changes)
     .filter(([t, rows]) => isCollection(t) && rows?.length)
@@ -107,6 +107,18 @@ export async function pushRows(userId: string, changes: Partial<Record<Collectio
   const gone = (changes.articles ?? []).filter((r) => r.deleted).map((r) => r.id);
   if (gone.length) queries.push(sql.query("delete from covers where user_id = $1 and id = any($2::text[])", [userId, gone]));
   if (queries.length) await sql.transaction(queries);
+  // The server is the referee: if a tombstone won against a pushed row, say so,
+  // so the device drops the row instead of trusting a push the server refused.
+  const revert: Partial<Record<Collection, string[]>> = {};
+  for (const [t, rows] of Object.entries(changes)) {
+    if (!isCollection(t)) continue;
+    const live = (rows ?? []).filter((r) => !r.deleted).map((r) => r.id);
+    if (!live.length) continue;
+    const res = await sql.query(`select id from ${t} where user_id = $1 and id = any($2::text[]) and deleted = true`, [userId, live]);
+    const refused = (res as Record<string, unknown>[]).map((r) => String(r.id));
+    if (refused.length) revert[t as Collection] = refused;
+  }
+  return revert;
 }
 
 /** One article's full text. */

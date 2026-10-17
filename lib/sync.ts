@@ -24,6 +24,7 @@ import type { Article } from "./article";
 import { forgetCover } from "./covers";
 
 const COLLECTIONS = ["articles", "highlights", "glosses", "briefs", "progress"] as const;
+const isCollection = (t: string): t is (typeof COLLECTIONS)[number] => (COLLECTIONS as readonly string[]).includes(t);
 type Collection = (typeof COLLECTIONS)[number];
 
 type Entity = { articleId: string; data: unknown; key: string };
@@ -144,6 +145,18 @@ export function startSync(userId: string) {
       for (const r of batch) (changes[r.c] ??= []).push(r.row);
       const res = await fetch("/api/sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ changes }) });
       if (!res.ok) throw new Error(`push ${res.status}`);
+      const { revert } = (await res.json()) as { revert?: Partial<Record<Collection, string[]>> };
+      if (revert && Object.values(revert).some((ids) => ids?.length)) {
+        const ghosts: Partial<Record<Collection, { id: string; deleted: true }[]>> = {};
+        for (const [tRaw, ids] of Object.entries(revert)) {
+          const t = tRaw as Collection;
+          if (!isCollection(t) || !ids?.length) continue;
+          (ghosts[t] ??= []).push(...ids.map((id): { id: string; deleted: true } => ({ id, deleted: true })));
+          for (const id of ids) delete base.seen[t][id];
+        }
+        useStore.getState().applyRemote(ghosts as RemoteChanges);
+        save();
+      }
       for (const r of batch) {
         if (r.key === null) delete base.seen[r.c][r.row.id];
         else base.seen[r.c][r.row.id] = [r.key, r.row.articleId];

@@ -50,8 +50,8 @@ export async function POST(req: Request) {
     count += changes[table].length;
   }
   if (count > MAX_ROWS) return Response.json({ error: "Too many rows in one push." }, { status: 413 });
-  await pushRows(userId, changes);
-  return Response.json({ ok: true, count });
+  const revert = await pushRows(userId, changes);
+  return Response.json({ ok: true, count, revert });
 }
 
 function valid(r: InRow): boolean {
