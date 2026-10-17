@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { GlossMark } from "@/components/brand/Gloss";
 
-export default function Error({ reset }: { error: Error; reset: () => void }) {
+export default function Error({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  if (typeof window !== "undefined") console.error("[page-error]", error?.message, error?.stack);
   return (
     <main className="relative z-[1] grid min-h-dvh place-items-center px-6 text-center">
       <div className="rise">

@@ -229,7 +229,8 @@ const TOPIC_ORDER = Object.fromEntries(TOPICS.map((t, i) => [t.key, i])) as Reco
 
 export function sortBooks(books: Book[], sort: Sort): Book[] {
   const by = [...books];
-  if (sort === "topic") by.sort((a, b) => TOPIC_ORDER[a.topic] - TOPIC_ORDER[b.topic] || a.added - b.added);
+  const ord = (k: string) => (k in TOPIC_ORDER ? TOPIC_ORDER[k] : TOPICS.length);
+  if (sort === "topic") by.sort((a, b) => ord(a.topic) - ord(b.topic) || a.added - b.added);
   if (sort === "recent") by.sort((a, b) => b.added - a.added);
   if (sort === "color") by.sort((a, b) => lookOf(a).hue - lookOf(b).hue || lookOf(a).h - lookOf(b).h);
   if (sort === "length") by.sort((a, b) => a.minutes - b.minutes);
@@ -238,7 +239,7 @@ export function sortBooks(books: Book[], sort: Sort): Book[] {
 
 /** The label on the shelf under the first book of each run: a topic, a month or a length. */
 export function groupOf(b: Book, sort: Sort): { key: string; label: string; icon?: TopicKey | TagKey } | null {
-  if (sort === "topic") return { key: b.topic, label: TOPIC[b.topic].name, icon: b.topic };
+  if (sort === "topic") return { key: b.topic, label: topicMeta(b.topic).name, icon: b.topic };
   if (sort === "recent") {
     const label = new Date(b.added).toLocaleDateString("en-GB", { month: "long", year: "numeric" });
     return { key: label, label };
@@ -290,7 +291,7 @@ export type Shelving = { topic: string; tags: string[]; scene?: string };
 /** Tags: a few short lowercase words, never the topic's own name. */
 export function cleanTags(v: unknown, topic: string): string[] {
   if (!Array.isArray(v)) return [];
-  const name = TOPIC[topic].name.toLowerCase();
+  const name = topicMeta(topic).name.toLowerCase();
   const out: string[] = [];
   for (const t of v) {
     if (typeof t !== "string") continue;
