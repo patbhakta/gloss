@@ -98,8 +98,27 @@ export async function pullRows(userId: string, since: string): Promise<{ now: st
 }
 
 /** Upsert every collection's rows in one transaction. The server stamps the time, so the latest write wins. */
+/** Nothing saved before the shelf was reset on 2026-10-17 may come back. */
+const SHELF_RESET_MS = Date.parse("2026-10-17T10:00:00Z");
+
 export async function pushRows(userId: string, changes: Partial<Record<Collection, PushRow[]>>): Promise<Partial<Record<Collection, string[]>>> {
+  // (changes is narrowed to admitted rows below)
   const sql = db();
+  // Ghosts from before the shelf reset: refused outright, never inserted.
+  const revert: Partial<Record<Collection, string[]>> = {};
+  const admitted: Partial<Record<Collection, PushRow[]>> = {};
+  for (const [t, rows] of Object.entries(changes)) {
+    if (!isCollection(t) || !rows?.length) continue;
+    const ok: PushRow[] = [];
+    for (const r of rows) {
+      const added = Number((r.data as { addedAt?: number } | undefined)?.addedAt ?? Number.POSITIVE_INFINITY);
+      if (!r.deleted && t === "articles" && added < SHELF_RESET_MS) (revert[t as Collection] ??= []).push(r.id);
+      else ok.push(r);
+    }
+    if (ok.length) admitted[t as Collection] = ok;
+  }
+  changes = admitted;
+
   const queries = Object.entries(changes)
     .filter(([t, rows]) => isCollection(t) && rows?.length)
     .map(([t, rows]) => sql.query(upsert(t as Collection), [userId, JSON.stringify(rows)]));
@@ -109,14 +128,13 @@ export async function pushRows(userId: string, changes: Partial<Record<Collectio
   if (queries.length) await sql.transaction(queries);
   // The server is the referee: if a tombstone won against a pushed row, say so,
   // so the device drops the row instead of trusting a push the server refused.
-  const revert: Partial<Record<Collection, string[]>> = {};
   for (const [t, rows] of Object.entries(changes)) {
     if (!isCollection(t)) continue;
     const live = (rows ?? []).filter((r) => !r.deleted).map((r) => r.id);
     if (!live.length) continue;
     const res = await sql.query(`select id from ${t} where user_id = $1 and id = any($2::text[]) and deleted = true`, [userId, live]);
     const refused = (res as Record<string, unknown>[]).map((r) => String(r.id));
-    if (refused.length) revert[t as Collection] = refused;
+    if (refused.length) for (const id of refused) (revert[t as Collection] ??= []).push(id);
   }
   return revert;
 }
