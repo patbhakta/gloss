@@ -189,7 +189,8 @@ export const useStore = create<State>((set, get) => ({
       // bhakta.us migration: the pre-limbic shared shelf becomes Pat's, minus
       // the Chandler chapters that were once shelved to him by mistake — those
       // are dropped here and pushed as tombstones, so every device cleans up.
-      if (!localStorage.getItem(KEY) && localStorage.getItem("gloss:v1")) {
+      // Pat only: another limbic starts from an empty shelf, never Pat's.
+      if (limbicId() === "pat" && !localStorage.getItem(KEY) && localStorage.getItem("gloss:v1")) {
         try {
           const old = JSON.parse(localStorage.getItem("gloss:v1") || "{}") as Partial<Persisted>;
           old.library = (old.library ?? []).filter((x) => !/^Chandler\b/i.test(String(x.title ?? "")));
