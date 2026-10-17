@@ -24,8 +24,16 @@
   font-display: swap;
   src: url("/fonts/new-yorker.ttf") format("truetype");
 }
+/* Huible wordmark — Yankee (from Pat, freeware FontSpace). */
+@font-face {
+  font-family: "Yankee";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/yankee.ttf") format("truetype");
+}
 .ny-wordmark {
-  font-family: "New Yorker", "EB Garamond", Georgia, serif !important;
+  font-family: "Yankee", "New Yorker", "EB Garamond", Georgia, serif !important;
   letter-spacing: 0.01em;
 }
 
