@@ -82,7 +82,7 @@ export function Reader({ id, initial }: { id: string; initial: Article | null })
           <p className="mt-6 font-serif text-[26px] text-ink">This text is not on this device.</p>
           <p className="mt-2 text-[14px] text-ink-3">Imported texts live in the browser that imported them, or in your account when you are signed in.</p>
           <Link href="/" className="mt-6 inline-flex h-10 items-center rounded-full bg-ink px-5 text-[14px] font-medium text-bg">
-            Back to the library
+            Back to limbics
           </Link>
         </div>
       </main>
@@ -556,19 +556,12 @@ function ReaderInner({ article }: { article: Article }) {
                   ❦
                 </p>
                 {article.source && <p>From {article.source}.</p>}
-                <p className="mt-1">
-                  Glosses are powered by DeepSeek V4.1 Flash, served by{" "}
-                  <a href={BRAND.togetherUrl} target="_blank" rel="noopener noreferrer" className="text-ink-2 underline decoration-rule-strong underline-offset-4 hover:text-ink">
-                    Together AI
-                  </a>
-                  .
-                </p>
                 <div className="mt-6 flex flex-wrap gap-2">
                   <button type="button" onClick={() => setUI({ notebookOpen: true })} className="h-9 rounded-full border border-rule px-4 text-[13px] font-medium text-ink-2 hover:border-rule-strong hover:text-ink">
-                    Open your notebook
+                    Open your memory
                   </button>
                   <Link href="/" className="inline-flex h-9 items-center rounded-full border border-rule px-4 text-[13px] font-medium text-ink-2 hover:border-rule-strong hover:text-ink">
-                    Back to the library
+                    Back to limbics
                   </Link>
                 </div>
               </footer>

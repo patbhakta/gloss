@@ -27,11 +27,11 @@ export function Peek({ peek }: { peek: { n: number; rect: DOMRect } | null }) {
 
 const KEYS: [string, string][] = [
   ["Select text, then type", "Ask about the selection"],
-  ["/", "Ask about the whole text"],
+  ["/", "Ask about this moment"],
   ["J  K", "Next and previous paragraph"],
   ["Enter", "Ask about the current paragraph"],
   ["[  ]", "Previous and next gloss"],
-  ["B", "Gloss this text"],
+  ["B", "Summarize this moment"],
   ["N", "Notebook"],
   ["F", "Focus mode"],
   ["Esc", "Close or step back"],

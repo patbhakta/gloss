@@ -16,6 +16,18 @@
   src: url("/fonts/eb-garamond-italic-variable.woff2") format("woff2");
 }
 
+/* Huible wordmark — New York serif (Pat directive Oct 17). */
+@font-face {
+  font-family: "New York";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/newyork.woff2") format("woff2");
+}
+.ny-wordmark {
+  font-family: "New York", "EB Garamond", Georgia, serif !important;
+}
+
 /* ==========================================================================
    Gloss. A critical edition for anything you read.
    Paper, ink, a yellow highlighter for you and a vermilion pen for the model.

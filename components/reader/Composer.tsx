@@ -69,7 +69,7 @@ export const Composer = forwardRef<ComposerHandle, { currentBlock: () => string 
               inputRef.current?.blur();
             }
           }}
-          placeholder="Ask about the whole text"
+          placeholder="Ask about this moment"
           aria-label="Ask anything about the whole text"
           className="h-9 min-w-0 flex-1 bg-transparent text-[14.5px] text-ink outline-none focus-visible:outline-none placeholder:text-ink-3"
         />
