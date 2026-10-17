@@ -165,7 +165,7 @@ export function Margin({
   const lead = [active, hover && hover !== active ? hover : null].filter((x): x is string => Boolean(x && layout.tops[x] !== undefined));
 
   return (
-    <div data-notes={notes.length} data-glosses={glosses.length} ref={colRef} className="relative" style={{ minHeight: layout.height + 40 }}>
+    <div ref={colRef} className="relative" style={{ minHeight: layout.height + 40 }}>
       {glosses.length === 0 && notes.length === 0 && <EmptyMargin top={layout.hintTop} />}
 
       <svg className="pointer-events-none absolute top-0 overflow-visible" style={{ left: -gutter, width: gutter, height: Math.max(1, layout.height) }} aria-hidden>
