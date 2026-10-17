@@ -351,7 +351,7 @@ export const useStore = create<State>((set, get) => ({
       for (const r of c.articles ?? []) {
         library = library.filter((x) => x.id !== r.id);
         if (r.deleted || !r.data) void dropDoc(r.id);
-        else library = [r.data, ...library];
+        else if ((r.data as { id?: string }).id) library = [r.data, ...library];
       }
 
       const merge = <T extends { id: string; createdAt: number }>(cur: Record<string, T[]>, rows: RemoteRow<T>[] = [], keep?: (t: T) => boolean) => {

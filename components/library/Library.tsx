@@ -133,7 +133,7 @@ export function Library() {
     if (hydrated && prefs.paintedCovers) void paintAll(useStore.getState().library);
   }, [hydrated, prefs.paintedCovers, library]);
 
-  const own = library.filter((x) => x.origin !== "sample");
+  const own = library.filter((x) => x.origin !== "sample" && x.id && x.title);
   const books = useMemo(() => {
     const read = (id: string) => (hydrated ? progress[id]?.pct ?? 0 : 0);
     const marks = (id: string) => (hydrated ? (highlights[id] ?? []).length : 0);
