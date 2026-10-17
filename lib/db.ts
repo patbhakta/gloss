@@ -91,7 +91,7 @@ export async function pullRows(userId: string, since: string): Promise<{ now: st
   const changes = Object.fromEntries(
     COLLECTIONS.map((t, i) => [
       t,
-      (results[i] as Record<string, unknown>[]).map((r) => ({ id: String(r.id), articleId: String(r.article_id), data: r.deleted ? null : r.data, deleted: Boolean(r.deleted) })),
+      (results[i] as Record<string, unknown>[]).map((r) => ({ id: String(r.id), articleId: String(r.article_id), data: r.deleted ? null : { ...(r.data as Record<string, unknown>), id: String(r.id) }, deleted: Boolean(r.deleted) })),
     ])
   ) as Record<Collection, PullRow[]>;
   return { now: new Date((clock as { now: string }[])[0].now).toISOString(), changes };
