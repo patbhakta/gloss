@@ -94,6 +94,7 @@ export function ShelfSheet({
   const onOpenChange = (v: boolean) => setUI({ shelf: v ? "texts" : null });
   const highlights = useStore((s) => s.highlights);
   const [q, setQ] = useState("");
+  const [textHits, setTextHits] = useState<{ literal: { articleId: string; blockId: string; snippet: string }[]; semantic: { articleId: string; blockId: string; snippet: string; score?: number }[] }>({ literal: [], semantic: [] });
   const [filter, setFilter] = useState<Filter>("all");
   const [exported, setExported] = useState<number | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
@@ -167,6 +168,19 @@ export function ShelfSheet({
     });
   }, [allHighlights, q, titles]);
   const anyNotes = items.some((it) => it.glosses > 0) || allHighlights.length > 0;
+
+  // Words that match no note may still live in the texts themselves: deep
+  // search (literal + semantic) over the reader's paragraphs.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (q.trim().length < 3) { setTextHits({ literal: [], semantic: [] }); return; }
+      fetch("/api/search", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ q }) })
+        .then((r) => (r.ok ? r.json() : { literal: [], semantic: [] }))
+        .then((j) => setTextHits(j))
+        .catch(() => setTextHits({ literal: [], semantic: [] }));
+    }, 250);
+    return () => clearTimeout(t);
+  }, [q]);
 
   const counts = useMemo(() => Object.fromEntries(FILTERS.map((f) => [f.key, items.filter(f.test).length])) as Record<Filter, number>, [items]);
   const shown = useMemo(() => {
@@ -287,9 +301,30 @@ export function ShelfSheet({
                   }}
                 />
               ))}
-              {!shownHighlights.length && (
+              {!shownHighlights.length && !textHits.literal.length && !textHits.semantic.length && (
                 <li className="py-16 text-center text-[14px] text-ink-3">
                   {q ? <>No highlight or note matches &ldquo;{q}&rdquo;.</> : "No highlights yet."}
+                </li>
+              )}
+              {q.trim().length >= 3 && (textHits.literal.length > 0 || textHits.semantic.length > 0) && (
+                <li className="md:col-span-2 mt-2">
+                  <p className="mb-2 text-[12px] font-medium uppercase tracking-[0.08em] text-ink-3">In your texts</p>
+                  <ul className="grid gap-2 md:grid-cols-2">
+                    {[...textHits.literal.map((x) => ({ ...x, kind: "exact" })), ...textHits.semantic.filter((x) => !textHits.literal.some((l) => l.blockId === x.blockId && l.articleId === x.articleId)).map((x) => ({ ...x, kind: `meaning ${x.score ?? ""}%` }))]
+                      .slice(0, 6)
+                      .map((x, i) => (
+                        <li key={x.articleId + x.blockId + i}>
+                          <button
+                            type="button"
+                            onClick={() => { onOpenChange(false); onOpen(x.articleId, x.blockId); }}
+                            className="w-full rounded-xl border border-rule px-3 py-2 text-left hover:border-rule-strong"
+                          >
+                            <span className="block text-[12px] text-ink-3">{titles.get(x.articleId)?.title ?? x.articleId} · {x.kind}</span>
+                            <span className="block text-[13.5px] leading-snug text-ink-2">{x.snippet}</span>
+                          </button>
+                        </li>
+                      ))}
+                  </ul>
                 </li>
               )}
             </ul>

@@ -19,6 +19,7 @@ import { allow } from "./ratelimit";
 import { classify } from "./shelve";
 import { excerptOf } from "./excerpt";
 import type { LibraryItem } from "./store";
+import { searchTexts as textSearch } from "@/lib/textsearch";
 
 const VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
 const PER_CALL = 25;
@@ -62,6 +63,21 @@ const TOOLS = [
       additionalProperties: false,
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: "search_texts",
+    title: "Search inside texts",
+    description: "Search the full text of the reader's texts, literal and semantic. Literal finds exact words; semantic finds passages by meaning (e.g. 'trouble having a baby' finds talk of fertility). Returns the text, its block, and a snippet.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "What to look for — exact words or a meaning." },
+        mode: { type: "string", enum: ["literal", "semantic", "both"], default: "both" },
+      },
+      required: ["query"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: false },
   },
   {
     name: "search_library",
@@ -165,6 +181,7 @@ async function answer(msg: Rpc, userId: string, label: string): Promise<object |
         if (name === "save_articles") return ok(await saveArticles(userId, args, label));
         if (name === "save_text") return ok(await saveText(userId, args, label));
         if (name === "search_library") return ok(await searchLibrary(userId, args));
+        if (name === "search_texts") return ok(await searchTextsMcp(userId, args));
         if (name === "list_topics") return ok(await listTopics(userId));
         return err(-32602, `Unknown tool: ${name}`);
       } catch (e) {
@@ -365,6 +382,19 @@ async function searchLibrary(userId: string, args: Record<string, unknown>) {
     ? `${found.length} found${found.length > shown.length ? `, showing ${shown.length}` : ""}:\n${shown.map((b) => `- ${b.title}${b.author ? `, ${b.author}` : ""} (${b.topic}, ${b.minutes} min, ${b.status})${b.url ? ` ${b.url}` : ""}`).join("\n")}`
     : "Nothing in the library matches.";
   return toolResult(text, { total: found.length, results: shown });
+}
+
+/* ---------- search_texts: literal + semantic over the reader's own texts ---------- */
+
+async function searchTextsMcp(userId: string, args: Record<string, unknown>) {
+  const query = String(args.query ?? "").trim();
+  const mode = String(args.mode ?? "both");
+  if (query.length < 2) return toolError("Send at least two characters.");
+  const res = await textSearch(userId, query);
+  const parts: string[] = [];
+  if (mode !== "semantic" && res.literal.length) parts.push(`Literal:\n${res.literal.map((x) => `- ${x.articleId}: ${x.snippet}`).join("\n")}`);
+  if (mode !== "literal" && res.semantic.length) parts.push(`Semantic:\n${res.semantic.map((x) => `- ${x.articleId}${x.score ? ` (${x.score}%)` : ""}: ${x.snippet}`).join("\n")}`);
+  return toolResult(parts.join("\n\n") || "Nothing found.", res);
 }
 
 async function listTopics(userId: string) {
