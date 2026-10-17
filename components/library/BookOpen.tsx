@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ArrowRight, ArrowUpRight, ChevronDown, PencilLine, Star, Trash2 } from "lucide-react";
-import { fmtMinutes, hash, hostOf, lookOf, tagsOf, TOPIC, TOPICS, type Book, type TopicKey } from "@/lib/library";
+import { topicMeta, fmtMinutes, hash, hostOf, lookOf, tagsOf, TOPIC, TOPICS, slugTopic, type Book, type TopicKey } from "@/lib/library";
 import { Cover, Glyph, Spine } from "./Book";
 
 export type Origin = { el: HTMLElement; kind: "spine" | "cover" };
@@ -83,7 +83,7 @@ export function BookOpen({
   const readRef = useRef<HTMLButtonElement>(null);
   const closing = useRef(false);
   const look = lookOf(book);
-  const t = TOPIC[book.topic];
+  const t = topicMeta(book.topic);
   const reduce = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const shift = g.wide ? g.W / 2 : 0;
   const coverZ = `translateZ(${g.D / 2}px)`;
@@ -203,12 +203,26 @@ export function BookOpen({
                     <Glyph k={t.key} size={15} />
                     <span>{t.name}</span>
                     <ChevronDown size={13} strokeWidth={2.2} className="ob-chip-caret" aria-hidden />
-                    <select value={book.topic} onChange={(e) => onShelve(book, { topic: e.target.value as TopicKey })} aria-label="Topic">
+                    <select
+                      value={book.topic}
+                      onChange={(e) => {
+                        if (e.target.value === "__new__") {
+                          const name = window.prompt("Name your topic (e.g. Friends Moments):");
+                          if (!name) return;
+                          onShelve(book, { topic: slugTopic(name) });
+                        } else onShelve(book, { topic: e.target.value as TopicKey });
+                      }}
+                      aria-label="Topic"
+                    >
                       {TOPICS.map((x) => (
                         <option key={x.key} value={x.key}>
                           {x.name}
                         </option>
                       ))}
+                      {!(book.topic in TOPIC) && book.topic !== "unsorted" && (
+                        <option value={book.topic}>{topicMeta(book.topic).name}</option>
+                      )}
+                      <option value="__new__">+ New topic…</option>
                     </select>
                   </label>
                   <span className="ob-tools">

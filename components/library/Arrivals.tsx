@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
-import { TOPIC, lookOf, type Book } from "@/lib/library";
+import { topicMeta, TOPIC, lookOf, type Book } from "@/lib/library";
 import { MARK_NAMES, Mark, type AgentMark } from "./AgentMarks";
 import { Glyph, Plate } from "./Book";
 
@@ -48,7 +48,7 @@ export function Arrivals({
     seen.current = books.length;
     const el = ref.current;
     if (!fresh.length || !el || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const colors = fresh.flatMap((b) => [TOPIC[b.topic].shades[1], TOPIC[b.topic].shades[3]]);
+    const colors = fresh.flatMap((b) => [topicMeta(b.topic).shades[1], topicMeta(b.topic).shades[3]]);
     burst(el, [...colors, "#e8b04a", "#f3d9a4"], Math.min(70, 28 + fresh.length * 8));
   }, [books]);
 
@@ -108,7 +108,7 @@ export function Arrivals({
           <span key={latest.id} className="arr-latest">
             <span className="arr-title">{latest.title}</span>
             <span className="arr-topic">
-              <Glyph k={latest.topic} size={15} /> {TOPIC[latest.topic].name}
+              <Glyph k={latest.topic} size={15} /> {topicMeta(latest.topic).name}
             </span>
           </span>
         )}

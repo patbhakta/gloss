@@ -2,7 +2,7 @@
 
 import { memo, useEffect, useState } from "react";
 import { paintedUrl } from "@/lib/covers";
-import { iconSrc, lookOf, TOPIC, topicArtSrc, type Book, type Look, type TagKey, type TopicKey } from "@/lib/library";
+import { topicMeta, iconSrc, lookOf, TOPIC, topicArtSrc, type Book, type Look, type TagKey, type TopicKey } from "@/lib/library";
 
 /** One of the library's own emoji: a small clay figure for a topic or a tag. */
 export function Glyph({ k, size = 18, className = "" }: { k: TopicKey | TagKey; size?: number; className?: string }) {
@@ -15,7 +15,7 @@ const lastName = (a: string) => a.split(/&|,| and /)[0].trim().split(/\s+/).slic
 /** A book seen end-on: cloth, a title running down it, the author at the foot. */
 export const Spine = memo(function Spine({ book, look = lookOf(book) }: { book: Book; look?: Look }) {
   const { w, h, color, fg, style } = look;
-  const t = TOPIC[book.topic];
+  const t = topicMeta(book.topic);
   const wide = w >= 52;
   const by = lastName(book.author);
   // The author across the foot, as large as fits; on a spine too slim for the
@@ -83,7 +83,7 @@ export function Plate({ book, reveal = false }: { book: Book; reveal?: boolean }
     return <img src={painted ?? book.cover} alt="" decoding="async" draggable={false} className={cls} />;
   }
   if (book.image && !broken) {
-    const t = TOPIC[book.topic];
+    const t = topicMeta(book.topic);
     return (
       <span className="duotone" style={{ ["--ink-c" as string]: t.shades[2] }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -100,7 +100,7 @@ export function Plate({ book, reveal = false }: { book: Book; reveal?: boolean }
  * Sized by its container, so the same cover works at any scale.
  */
 export const Cover = memo(function Cover({ book, look = lookOf(book), draw = false }: { book: Book; look?: Look; draw?: boolean }) {
-  const t = TOPIC[book.topic];
+  const t = topicMeta(book.topic);
   return (
     <div className="cover" data-light={look.light || undefined} style={{ background: look.color, color: look.fg }}>
       <div className="cover-plate">

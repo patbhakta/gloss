@@ -8,7 +8,8 @@
  * agent server): no React, no store, no fetches.
  */
 
-export type TopicKey =
+export type TopicKey = string;
+export type FixedTopicKey =
   | "ai"
   | "programming"
   | "infra"
@@ -36,7 +37,7 @@ export type TopicKey =
   | "unsorted";
 
 export type Topic = {
-  key: TopicKey;
+  key: string;
   name: string;
   /** Cloth shades: [base, light, deep, pale]. */
   shades: [string, string, string, string];
@@ -75,9 +76,28 @@ export const TOPICS: Topic[] = [
   { key: "unsorted", name: "Unsorted", shades: ["#5d5a55", "#7b776f", "#3f3d39", "#aaa59b"], inks: "warm grey and charcoal", hint: "", blurb: "Not shelved yet. Gloss sorts new texts as they arrive." },
 ];
 
-export const TOPIC = Object.fromEntries(TOPICS.map((t) => [t.key, t])) as Record<TopicKey, Topic>;
-export const isTopic = (v: unknown): v is TopicKey => typeof v === "string" && v in TOPIC;
-export const topicOf = (v: unknown): TopicKey => (isTopic(v) ? v : "unsorted");
+export const TOPIC = Object.fromEntries(TOPICS.map((t) => [t.key, t])) as Record<string, Topic>;
+export const isTopic = (v: unknown): v is TopicKey => typeof v === "string" && (TOPIC[v] !== undefined || isCustomTopic(v));
+/** A reader-made topic: any lowercase slug with a dash, e.g. "friends-moments". */
+export const isCustomTopic = (v: unknown): v is string =>
+  typeof v === "string" && /^[a-z][a-z0-9-]{1,23}$/.test(v) && v.includes("-");
+export const topicOf = (v: unknown): string => (isTopic(v) ? v : "unsorted");
+
+/** The palette a reader-made topic draws from: every fixed topic lends its cloth. */
+const CUSTOM_PALETTE = TOPICS.filter((t) => t.key !== "unsorted").map((t) => t.shades);
+const hashStr = (s: string) => [...s].reduce((n, c) => (n * 31 + c.charCodeAt(0)) >>> 0, 7);
+
+/** A topic that exists only because a reader made it: stable shades from its name, no art of its own. */
+export const customTopic = (key: string): Topic => {
+  const shades = CUSTOM_PALETTE[hashStr(key) % CUSTOM_PALETTE.length];
+  const name = key.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  return { key, name, shades, inks: "reader-made", hint: "", blurb: "A topic you made." };
+};
+
+/** Any topic key — fixed or reader-made — resolved to its look. */
+export const topicMeta = (key: string): Topic => TOPIC[key] ?? customTopic(key);
+export const slugTopic = (name: string): string =>
+  name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 24) || "unsorted";
 
 /** One text as the shelves see it: the shelf entry, with your reading laid over it. */
 export type Book = {
@@ -86,7 +106,7 @@ export type Book = {
   author: string;
   year?: number;
   url?: string;
-  topic: TopicKey;
+  topic: string;
   minutes: number;
   dek?: string;
   tags: string[];
@@ -191,7 +211,7 @@ export function lookOf(b: Pick<Book, "id" | "topic" | "minutes">): Look {
 
 /* ---------- pictures ---------- */
 
-export const topicArtSrc = (k: TopicKey) => `/library/topics/${k}.webp`;
+export const topicArtSrc = (k: TopicKey) => `/library/topics/${TOPIC[k] ? k : "unsorted"}.webp`;
 export const iconSrc = (k: TopicKey | TagKey) => `/library/icons/${k}.webp`;
 
 /* ---------- shelving ---------- */
@@ -265,10 +285,10 @@ export function yearOf(published?: string): number | undefined {
 
 /* ---------- what the classifier returns ---------- */
 
-export type Shelving = { topic: TopicKey; tags: string[]; scene?: string };
+export type Shelving = { topic: string; tags: string[]; scene?: string };
 
 /** Tags: a few short lowercase words, never the topic's own name. */
-export function cleanTags(v: unknown, topic: TopicKey): string[] {
+export function cleanTags(v: unknown, topic: string): string[] {
   if (!Array.isArray(v)) return [];
   const name = TOPIC[topic].name.toLowerCase();
   const out: string[] = [];

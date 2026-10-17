@@ -8,7 +8,7 @@ import { TopBar } from "@/components/ui/TopBar";
 import { readingMinutes, tidyTitle, wordCount } from "@/lib/article";
 import { forgetCover, paintAll } from "@/lib/covers";
 import { SAMPLE_SHELF } from "@/lib/classics";
-import { SORTS, sortBooks, TAGS, TOPIC, TOPICS, topicOf, type Book, type Sort, type TagKey, type Topic, type TopicKey } from "@/lib/library";
+import { SORTS, sortBooks, TAGS, TOPIC, TOPICS, topicMeta, topicOf, customTopic, type Book, type Sort, type TagKey, type Topic, type TopicKey } from "@/lib/library";
 import { hideSample, useLibraryPrefs } from "@/lib/library-prefs";
 import { SAMPLES } from "@/lib/samples";
 import { applySettings } from "@/lib/settings";
@@ -185,14 +185,18 @@ export function Library() {
     (b: Book) => {
       const words = q.toLowerCase().trim().split(/\s+/).filter(Boolean);
       const t = tag ? TAGS.find((x) => x.key === tag)! : null;
-      return (!t || t.test(b)) && words.every((w) => `${b.title} ${b.author} ${TOPIC[b.topic].name} ${b.tags.join(" ")} ${b.year ?? ""}`.toLowerCase().includes(w));
+      return (!t || t.test(b)) && words.every((w) => `${b.title} ${b.author} ${topicMeta(b.topic).name} ${b.tags.join(" ")} ${b.year ?? ""}`.toLowerCase().includes(w));
     },
     [q, tag]
   );
   const shown = useMemo(() => new Set(sorted.filter((b) => (!only || b.topic === only) && match(b)).map((b) => b.id)), [sorted, only, match]);
 
   const topics = useMemo(
-    () => TOPICS.map((t) => ({ topic: t, books: books.filter((b) => b.topic === t.key).sort((a, b) => b.added - a.added) })).filter((x) => x.books.length),
+    () => {
+      const customKeys = [...new Set(books.map((b) => b.topic))].filter((k) => !(k in TOPIC) && k !== "unsorted");
+      const all = [...TOPICS, ...customKeys.map(customTopic)];
+      return all.map((t) => ({ topic: t, books: books.filter((b) => b.topic === t.key).sort((a, b) => b.added - a.added) })).filter((x) => x.books.length);
+    },
     [books]
   );
 
@@ -243,7 +247,7 @@ export function Library() {
   const openBook = open ? books.find((b) => b.id === open.id) ?? null : null;
   const first = user?.firstName;
   const owner = user?.fullName || first || "A Gloss reader";
-  const T = topic ? TOPIC[topic] : null;
+  const T = topic ? topicMeta(topic) : null;
   const topicBooks = useMemo(() => (topic ? books.filter((b) => b.topic === topic).sort((a, b) => b.added - a.added).filter(match) : []), [topic, books, match]);
   const screen = topic ? `topic-${topic}` : view;
 
