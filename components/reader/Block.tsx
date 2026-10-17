@@ -200,9 +200,12 @@ function legacyMedia(block: BlockT): { src: string; kind: "audio" | "video"; lab
 function BlockImpl({ block, n, first, marks, activeGloss, hoverGloss, activeHighlight, fresh, cursor, hasAt, onAsk }: Props) {
   const Tag = block.type === "h2" ? "h2" : block.type === "h3" ? "h3" : block.type === "figure" ? "figure" : "div";
   const content = segments(block, marks, activeGloss, hoverGloss, activeHighlight, fresh);
+  // A transcript line opens with a bold speaker label ("Chandler:") — a drop
+  // capital on it overlaps the name, so those never take the rubricated initial.
+  const speakerLine = block.runs.length > 0 && block.runs[0].strong === true && /^[A-Za-z. ']+$/.test((block.runs[0].text ?? "").replace(/:\s*$/, "")) && (block.runs[0].text ?? "").trim().endsWith(":");
   return (
     <Tag
-      className={`blk${first ? " is-first" : ""}${cursor ? " is-cursor" : ""}`}
+      className={`blk${first && !speakerLine ? " is-first" : ""}${cursor ? " is-cursor" : ""}`}
       data-block={block.id}
       data-type={block.type}
       data-n={n}
