@@ -1,0 +1,390 @@
+[
+ {
+  "id": "ei-dia1000_utt2",
+  "title": "Amusement in the Voice",
+  "kicker": "Emotional intelligence \u00b7 baseline",
+  "clip": "/media/ei/dia1000_utt2.mp3",
+  "clipName": "dia1000_utt2",
+  "values": [
+   {
+    "label": "amusement",
+    "score": 0.579
+   },
+   {
+    "label": "realization",
+    "score": 0.482
+   },
+   {
+    "label": "triumph",
+    "score": 0.221
+   },
+   {
+    "label": "contempt",
+    "score": 0.214
+   },
+   {
+    "label": "disappointment",
+    "score": 0.184
+   },
+   {
+    "label": "satisfaction",
+    "score": 0.181
+   }
+  ]
+ },
+ {
+  "id": "ei-dia127_utt4",
+  "title": "Excitement in the Voice",
+  "kicker": "Emotional intelligence \u00b7 baseline",
+  "clip": "/media/ei/dia127_utt4.mp3",
+  "clipName": "dia127_utt4",
+  "values": [
+   {
+    "label": "excitement",
+    "score": 0.739
+   },
+   {
+    "label": "interest",
+    "score": 0.238
+   },
+   {
+    "label": "amusement",
+    "score": 0.228
+   },
+   {
+    "label": "contemplation",
+    "score": 0.164
+   },
+   {
+    "label": "realization",
+    "score": 0.161
+   },
+   {
+    "label": "contempt",
+    "score": 0.136
+   }
+  ]
+ },
+ {
+  "id": "ei-dia219_utt10",
+  "title": "Calmness in the Voice",
+  "kicker": "Emotional intelligence \u00b7 baseline",
+  "clip": "/media/ei/dia219_utt10.mp3",
+  "clipName": "dia219_utt10",
+  "values": [
+   {
+    "label": "calmness",
+    "score": 0.386
+   },
+   {
+    "label": "interest",
+    "score": 0.351
+   },
+   {
+    "label": "excitement",
+    "score": 0.302
+   },
+   {
+    "label": "contentment",
+    "score": 0.279
+   },
+   {
+    "label": "determination",
+    "score": 0.198
+   },
+   {
+    "label": "joy",
+    "score": 0.172
+   }
+  ]
+ },
+ {
+  "id": "ei-dia273_utt3",
+  "title": "Confusion in the Voice",
+  "kicker": "Emotional intelligence \u00b7 baseline",
+  "clip": "/media/ei/dia273_utt3.mp3",
+  "clipName": "dia273_utt3",
+  "values": [
+   {
+    "label": "confusion",
+    "score": 0.846
+   },
+   {
+    "label": "contemplation",
+    "score": 0.555
+   },
+   {
+    "label": "concentration",
+    "score": 0.39
+   },
+   {
+    "label": "doubt",
+    "score": 0.187
+   },
+   {
+    "label": "interest",
+    "score": 0.155
+   },
+   {
+    "label": "awkwardness",
+    "score": 0.134
+   }
+  ]
+ },
+ {
+  "id": "ei-dia361_utt9",
+  "title": "Amusement in the Voice",
+  "kicker": "Emotional intelligence \u00b7 baseline",
+  "clip": "/media/ei/dia361_utt9.mp3",
+  "clipName": "dia361_utt9",
+  "values": [
+   {
+    "label": "amusement",
+    "score": 0.693
+   },
+   {
+    "label": "contempt",
+    "score": 0.188
+   },
+   {
+    "label": "calmness",
+    "score": 0.165
+   },
+   {
+    "label": "contemplation",
+    "score": 0.15
+   },
+   {
+    "label": "realization",
+    "score": 0.13
+   },
+   {
+    "label": "doubt",
+    "score": 0.1
+   }
+  ]
+ },
+ {
+  "id": "ei-dia466_utt6",
+  "title": "Amusement in the Voice",
+  "kicker": "Emotional intelligence \u00b7 baseline",
+  "clip": "/media/ei/dia466_utt6.mp3",
+  "clipName": "dia466_utt6",
+  "values": [
+   {
+    "label": "amusement",
+    "score": 0.427
+   },
+   {
+    "label": "excitement",
+    "score": 0.372
+   },
+   {
+    "label": "satisfaction",
+    "score": 0.248
+   },
+   {
+    "label": "admiration",
+    "score": 0.195
+   },
+   {
+    "label": "joy",
+    "score": 0.187
+   },
+   {
+    "label": "aesthetic appreciation",
+    "score": 0.117
+   }
+  ]
+ },
+ {
+  "id": "ei-dia615_utt7",
+  "title": "Anger in the Voice",
+  "kicker": "Emotional intelligence \u00b7 baseline",
+  "clip": "/media/ei/dia615_utt7.mp3",
+  "clipName": "dia615_utt7",
+  "values": [
+   {
+    "label": "anger",
+    "score": 0.406
+   },
+   {
+    "label": "confusion",
+    "score": 0.353
+   },
+   {
+    "label": "tiredness",
+    "score": 0.297
+   },
+   {
+    "label": "distress",
+    "score": 0.215
+   },
+   {
+    "label": "doubt",
+    "score": 0.173
+   },
+   {
+    "label": "determination",
+    "score": 0.135
+   }
+  ]
+ },
+ {
+  "id": "ei-dia664_utt4",
+  "title": "Anger in the Voice",
+  "kicker": "Emotional intelligence \u00b7 baseline",
+  "clip": "/media/ei/dia664_utt4.mp3",
+  "clipName": "dia664_utt4",
+  "values": [
+   {
+    "label": "anger",
+    "score": 0.408
+   },
+   {
+    "label": "distress",
+    "score": 0.378
+   },
+   {
+    "label": "disappointment",
+    "score": 0.262
+   },
+   {
+    "label": "disgust",
+    "score": 0.231
+   },
+   {
+    "label": "anxiety",
+    "score": 0.175
+   },
+   {
+    "label": "pain",
+    "score": 0.151
+   }
+  ]
+ },
+ {
+  "id": "ei-dia706_utt5",
+  "title": "Joy in the Voice",
+  "kicker": "Emotional intelligence \u00b7 baseline",
+  "clip": "/media/ei/dia706_utt5.mp3",
+  "clipName": "dia706_utt5",
+  "values": [
+   {
+    "label": "joy",
+    "score": 0.623
+   },
+   {
+    "label": "excitement",
+    "score": 0.48
+   },
+   {
+    "label": "amusement",
+    "score": 0.464
+   },
+   {
+    "label": "satisfaction",
+    "score": 0.154
+   },
+   {
+    "label": "interest",
+    "score": 0.119
+   }
+  ]
+ },
+ {
+  "id": "ei-dia793_utt2",
+  "title": "Determination in the Voice",
+  "kicker": "Emotional intelligence \u00b7 baseline",
+  "clip": "/media/ei/dia793_utt2.mp3",
+  "clipName": "dia793_utt2",
+  "values": [
+   {
+    "label": "determination",
+    "score": 0.292
+   },
+   {
+    "label": "excitement",
+    "score": 0.211
+   },
+   {
+    "label": "amusement",
+    "score": 0.12
+   },
+   {
+    "label": "pride",
+    "score": 0.107
+   },
+   {
+    "label": "concentration",
+    "score": 0.104
+   }
+  ]
+ },
+ {
+  "id": "ei-dia796_utt18",
+  "title": "Admiration in the Voice",
+  "kicker": "Emotional intelligence \u00b7 baseline",
+  "clip": "/media/ei/dia796_utt18.mp3",
+  "clipName": "dia796_utt18",
+  "values": [
+   {
+    "label": "admiration",
+    "score": 0.293
+   },
+   {
+    "label": "determination",
+    "score": 0.247
+   },
+   {
+    "label": "love",
+    "score": 0.205
+   },
+   {
+    "label": "aesthetic appreciation",
+    "score": 0.128
+   },
+   {
+    "label": "awkwardness",
+    "score": 0.118
+   },
+   {
+    "label": "amusement",
+    "score": 0.117
+   }
+  ]
+ },
+ {
+  "id": "ei-dia830_utt4",
+  "title": "Admiration in the Voice",
+  "kicker": "Emotional intelligence \u00b7 baseline",
+  "clip": "/media/ei/dia830_utt4.mp3",
+  "clipName": "dia830_utt4",
+  "values": [
+   {
+    "label": "admiration",
+    "score": 0.642
+   },
+   {
+    "label": "adoration",
+    "score": 0.599
+   },
+   {
+    "label": "aesthetic appreciation",
+    "score": 0.392
+   },
+   {
+    "label": "desire",
+    "score": 0.379
+   },
+   {
+    "label": "amusement",
+    "score": 0.328
+   },
+   {
+    "label": "love",
+    "score": 0.279
+   }
+  ]
+ }
+]

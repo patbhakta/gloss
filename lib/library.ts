@@ -212,7 +212,7 @@ export function lookOf(b: Pick<Book, "id" | "topic" | "minutes">): Look {
 /* ---------- pictures ---------- */
 
 export const topicArtSrc = (k: TopicKey) => `/library/topics/${TOPIC[k] ? k : "unsorted"}.webp`;
-export const iconSrc = (k: TopicKey | TagKey) => `/library/icons/${k}.webp`;
+export const iconSrc = (k: TopicKey | TagKey) => `/library/icons/${TOPIC[k] || TAGS.find((t) => t.key === k) ? k : "unsorted"}.webp`;
 
 /* ---------- shelving ---------- */
 

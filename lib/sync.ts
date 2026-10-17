@@ -35,7 +35,7 @@ type OutRow = { id: string; articleId: string; data: unknown; deleted?: boolean;
 const BATCH_BYTES = 1_500_000;
 const MAX_BODY = 4_300_000;
 /** Pulls overlap a little, so a write that landed while the last pull ran is not missed. Applying a row twice is harmless. */
-const OVERLAP_MS = 30_000;
+const OVERLAP_MS = 10 * 60_000;
 
 /** JSON with sorted keys, so the same object always compares equal, whatever order Postgres hands keys back in. */
 function stable(v: unknown): string {
