@@ -212,8 +212,9 @@ function ReaderInner({ article }: { article: Article }) {
     () =>
       article.blocks.find((b) => {
         if (b.type !== "p") return false;
-        const t = (ix.texts.get(b.id) ?? "").trim();
-        return t.length >= 3 && !t.startsWith("[") && !t.startsWith("(");
+        // A spoken line opens with a speaker: "Chandler: ..." — headers and
+        // stage directions never match, wherever they fall in the skit.
+        return /^[A-Z][\w .\'-]{0,28}:\s/.test((ix.texts.get(b.id) ?? "").trim());
       })?.id,
     [article.blocks, ix]
   );
