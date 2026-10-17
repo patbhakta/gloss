@@ -1,19 +1,74 @@
 /**
  * Postgres on Neon, over its HTTP driver: one round trip per query, no pool
  * to manage in serverless functions. Server-side only.
+ *
+ * bhakta.us: also supports a plain local Postgres (node-postgres pool) when
+ * DATABASE_URL is not a Neon endpoint — single-user tailnet deploy keeps its
+ * library in the host's Postgres next door.
  */
 
 import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 
-let client: NeonQueryFunction<false, false> | null = null;
+type Query = { text: string; params?: unknown[] };
+type Sql = {
+  query: (text: string, params?: unknown[]) => Query & Promise<Record<string, unknown>[]>;
+  transaction: (queries: Query[]) => Promise<Record<string, unknown>[][]>;
+};
+
+let sql: Sql | null = null;
+
+/** Local Postgres adapter with the same query()/transaction() surface the Neon driver gives. */
+function localSql(): Sql {
+  // Lazy import so bundling stays optional for pure-Neon deployments.
+  const { Pool } = require("pg") as typeof import("pg");
+  const pool = new Pool({ max: 5, connectionString: process.env.DATABASE_URL });
+  const run = async (client: { query: (t: string, p?: unknown[]) => Promise<{ rows: Record<string, unknown>[] }> }, q: Query) =>
+    (await client.query(q.text, q.params)).rows;
+  const make = (text: string, params?: unknown[]) => {
+    const q: Query = { text, params };
+    return Object.assign(q, {
+      then: (onFulfilled: (rows: Record<string, unknown>[]) => unknown, onRejected: (e: unknown) => unknown) =>
+        pool.connect().then(async (c) => {
+          try { return onFulfilled(await run(c, q)); } catch (e) { return onRejected(e); } finally { c.release(); }
+        }),
+      catch: (onRejected: (e: unknown) => unknown) =>
+        pool.connect().then(async (c) => {
+          try { return await run(c, q); } catch (e) { return onRejected(e); } finally { c.release(); }
+        }),
+    }) as Query & Promise<Record<string, unknown>[]>;
+  };
+  return {
+    query: make,
+    transaction: async (queries: Query[]) => {
+      const c = await pool.connect();
+      const out: Record<string, unknown>[][] = [];
+      try {
+        await c.query("begin");
+        for (const q of queries) out.push(await run(c, q));
+        await c.query("commit");
+      } catch (e) {
+        await c.query("rollback");
+        throw e;
+      } finally {
+        c.release();
+      }
+      return out;
+    },
+  };
+}
 
 export function db() {
-  if (!client) {
+  if (!sql) {
     const url = process.env.DATABASE_URL;
     if (!url) throw new Error("DATABASE_URL is not set.");
-    client = neon(url);
+    if (/\.neon\.(tech|new)|neon\.tech/i.test(new URL(url).hostname)) {
+      const n = neon(url) as unknown;
+      sql = n as Sql;
+    } else {
+      sql = localSql();
+    }
   }
-  return client;
+  return sql;
 }
 
 /** The tables the sync route reads and writes. Names are only ever taken from this list. */
@@ -97,7 +152,7 @@ export async function createToken(userId: string, id: string, hash: string, labe
 
 export async function listTokens(userId: string): Promise<AgentToken[]> {
   const rows = await db().query("select id, label, created_at, last_used_at from agent_tokens where user_id = $1 and not revoked order by created_at desc", [userId]);
-  return rows.map((r) => ({ id: String(r.id), label: String(r.label), createdAt: new Date(r.created_at).toISOString(), lastUsedAt: r.last_used_at ? new Date(r.last_used_at).toISOString() : null }));
+  return rows.map((r) => ({ id: String(r.id), label: String(r.label), createdAt: new Date(String(r.created_at)).toISOString(), lastUsedAt: r.last_used_at ? new Date(String(r.last_used_at)).toISOString() : null }));
 }
 
 export async function revokeToken(userId: string, id: string): Promise<boolean> {
