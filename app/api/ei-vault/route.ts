@@ -40,7 +40,7 @@ export async function POST() {
       { id: uid(), type: "quote", runs: [{ text: `A voice carrying ${lead.label} — ${Math.round(lead.score * 100)} parts in a hundred. The atlas heard it; your limbic reads it.` }] },
       { id: uid(), type: "h3", runs: [{ text: "The clip" }] },
       { id: uid(), type: "p", runs: [{ text: "Play the reading and hear it for yourself. What the machine measured is shelved as a note on the right — yours to keep, edit, or disagree with." }] },
-      { id: uid(), type: "media", src: p.clip, kind: "audio" },
+      { id: uid(), type: "media", src: p.clip, kind: "audio", runs: [] },
     ];
     const note = `Voice reading (prosody): ${p.values.map((v) => `${v.label} ${v.score.toFixed(2)}`).join(", ")}`;
     await db().query(
@@ -49,8 +49,8 @@ export async function POST() {
       [
         userId,
         p.id,
-        JSON.stringify({ id: p.id, title: p.title, author: "Hume prosody atlas", published: "", sourceUrl: "", topic: "emotional-intelligence", addedBy: "agent", words: 90, addedAt: Date.now() }),
-        JSON.stringify({ v: 3, title: p.title, author: "Hume prosody atlas", blocks: blocks }),
+        JSON.stringify({ id: p.id, title: p.title, author: "Hume", published: "", sourceUrl: "", topic: "emotional-intelligence", addedBy: "agent", words: 90, addedAt: Date.now() }),
+        JSON.stringify({ v: 3, title: p.title, author: "Hume", blocks: blocks }),
       ],
     );
     // the reading as a margin note, anchored to the clip block
