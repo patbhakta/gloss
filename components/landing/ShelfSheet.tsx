@@ -419,7 +419,8 @@ function RenameRow({ title, onDone }: { title: string; onDone: (title: string | 
 
 /** One highlight on the shelf: the marked words, the reader's note under them, and where they are from. */
 function HighlightRow({ h, i, title, onOpen }: { h: Highlight; i: number; title: string; onOpen: () => void }) {
-  const clipSrc = useClipSrc(h.articleId, h.anchor?.start?.b);
+  const fetched = useClipSrc(h.articleId, h.anchor?.start?.b);
+  const clipSrc = h.clip ?? fetched;
   return (
     <li className="shelf-row" style={{ animationDelay: `${Math.min(i, 14) * 18}ms` }}>
       <a

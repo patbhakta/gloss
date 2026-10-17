@@ -222,7 +222,7 @@ const NoteCard = forwardRef<HTMLButtonElement, { note: Highlight; articleEl: HTM
         style={{ ...marginStyle(top, fresh), ["--note-c" as string]: MARKERS.find((mk) => mk.key === (note.color ?? "yellow"))?.color }}
         aria-label={`Your note: ${note.note}. Edit note.`}
       >
-        <ReadingCard note={note.note ?? ""} clipSrc={clipSrcFor(note.anchor?.start?.b)} />
+        <ReadingCard note={note.note ?? ""} clipSrc={note.clip ?? clipSrcFor(note.anchor?.start?.b)} />
       </button>
     );
   }

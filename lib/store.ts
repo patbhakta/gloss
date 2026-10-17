@@ -46,7 +46,7 @@ export type Gloss = {
  */
 export type Review = { due: number; step: number; last: number; off?: boolean };
 
-export type Highlight = { id: string; articleId: string; anchor: Anchor; createdAt: number; color?: Marker; note?: string; review?: Review };
+export type Highlight = { id: string; articleId: string; anchor: Anchor; createdAt: number; color?: Marker; note?: string; review?: Review; clip?: string };
 
 export type BriefState =
   | { status: "loading" }
