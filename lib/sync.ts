@@ -29,7 +29,7 @@ type Collection = (typeof COLLECTIONS)[number];
 
 type Entity = { articleId: string; data: unknown; key: string };
 type Snapshot = { entities: Record<Collection, Map<string, Entity>>; busy: Set<string> };
-type Baseline = { since: string | null; seen: Record<Collection, Record<string, [key: string, articleId: string]>> };
+type Baseline = { since: string | null; fullAt: string | null; seen: Record<Collection, Record<string, [key: string, articleId: string]>> };
 type OutRow = { id: string; articleId: string; data: unknown; deleted?: boolean; doc?: Article };
 
 /** Pushes are split to stay well under the 4.5MB request cap. */
@@ -86,7 +86,7 @@ export function watchShelf(): () => void {
   };
 }
 
-const emptyBaseline = (): Baseline => ({ since: null, seen: Object.fromEntries(COLLECTIONS.map((c) => [c, {}])) as Baseline["seen"] });
+const emptyBaseline = (): Baseline => ({ since: null, fullAt: null, seen: Object.fromEntries(COLLECTIONS.map((c) => [c, {}])) as Baseline["seen"] });
 
 export function startSync(userId: string) {
   const storeKey = `gloss:sync:${userId}`;
@@ -174,7 +174,12 @@ export function startSync(userId: string) {
   }
 
   async function pull() {
-    const q = base.since ? `?since=${encodeURIComponent(new Date(Date.parse(base.since) - OVERLAP_MS).toISOString())}` : "";
+    // Daily full re-verify: a device that synced exactly between a server-side
+    // change and its tombstone stamp can otherwise miss a deletion forever.
+    // Once a day the delta is replaced by a full pull from server truth.
+    const DAY = 86_400_000;
+    const fullDue = !base.fullAt || Date.now() - Date.parse(base.fullAt) > DAY;
+    const q = base.since && !fullDue ? `?since=${encodeURIComponent(new Date(Date.parse(base.since) - OVERLAP_MS).toISOString())}` : "";
     const res = await fetch(`/api/sync${q}`);
     if (!res.ok) throw new Error(`pull ${res.status}`);
     const { now, changes } = (await res.json()) as { now: string; changes: RemoteChanges };
@@ -198,6 +203,7 @@ export function startSync(userId: string) {
       }
     }
     base.since = now;
+    if (fullDue) base.fullAt = now;
     save();
   }
 
