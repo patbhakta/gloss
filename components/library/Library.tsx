@@ -20,6 +20,7 @@ import { Arrivals, type Wave } from "./Arrivals";
 import { Glyph } from "./Book";
 import { BookOpen, type Origin } from "./BookOpen";
 import { Shelf } from "./Shelf";
+import { VaultChat } from "./VaultChat";
 import { Starter } from "./Starter";
 import { TopicGrid, TopicPage } from "./Topics";
 
@@ -339,6 +340,7 @@ export function Library() {
           <div className="lib-tools">
             <ViewSwitch view={view} onChange={(v) => go({ view: v })} />
             {searchBox}
+            <div className="pointer-events-none fixed bottom-4 right-4 z-40 max-md:bottom-3 max-md:right-3"><VaultChat /></div>
             {view === "shelf" && (
               <div className="lib-sort" role="radiogroup" aria-label="Arrange by">
                 <span className="px-2 text-[12.5px] text-ink-4 max-md:hidden">Arrange by</span>
