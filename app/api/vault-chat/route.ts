@@ -61,12 +61,36 @@ export async function POST(req: Request) {
   const titleOf = new Map(artsFull.map((a) => [a.id, a.data?.title ?? a.id]));
   const blocksOf = new Map(artsFull.map((a) => [a.id, (a.doc?.blocks ?? []).map((b) => ({ id: b.id, text: (b.runs ?? []).map((r) => r.text ?? "").join("") }))]));
 
+  // Notes pinned to lines (delivery descriptions, EI machine readings) are
+  // part of the truth the reader sees - the chat must see them too.
+  const notesByArticle = new Map<string, Map<string, string[]>>();
+  try {
+    const hl = (await db().query(
+      "select article_id, data from highlights where user_id = $1 and article_id = any($2::text[]) and deleted = false",
+      [userId, ids],
+    )) as unknown as { article_id: string; data: { note?: string; anchor?: { start?: { b?: string } } } }[];
+    for (const h of hl) {
+      const b = h.data?.anchor?.start?.b;
+      const note = (h.data?.note ?? "").trim();
+      if (!b || !note) continue;
+      if (!notesByArticle.has(h.article_id)) notesByArticle.set(h.article_id, new Map());
+      const m = notesByArticle.get(h.article_id)!;
+      if (!m.has(b)) m.set(b, []);
+      m.get(b)!.push(note);
+    }
+  } catch {
+    /* notes are enrichment - never fail the answer over them */
+  }
+
   const passages: string[] = [];
   const sources: { id: string; title: string; snippet: string }[] = [];
   for (const h of hits) {
     const blocks = blocksOf.get(h.articleId) ?? [];
     const at = blocks.findIndex((b) => b.id === h.blockId);
-    const window = at < 0 ? [] : blocks.slice(Math.max(0, at - 1), at + 2).map((b) => b.text).filter(Boolean);
+    const window = at < 0 ? [] : blocks.slice(Math.max(0, at - 1), at + 2).map((b) => {
+      const notes = notesByArticle.get(h.articleId)?.get(b.id) ?? [];
+      return notes.length ? `${b.text} [notes: ${notes.join("; ")}]` : b.text;
+    }).filter(Boolean);
     const text = window.join("\n").slice(0, 1200);
     if (!text) continue;
     const title = titleOf.get(h.articleId) ?? h.articleId;
