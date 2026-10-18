@@ -44,7 +44,11 @@ export const Spine = memo(function Spine({ book, look = lookOf(book) }: { book: 
         </>
       )}
       {style === "foil" && <span className="spine-orn">{book.favorite ? "★" : "◆"}</span>}
-      {style === "sans" && <Glyph k={t.key} size={15} className="spine-emoji" />}
+      {t.emoji ? (
+        <span aria-hidden className="spine-emoji" style={{ fontSize: Math.min(16, w * 0.34) }}>{t.emoji}</span>
+      ) : (
+        style === "sans" && <Glyph k={t.key} size={15} className="spine-emoji" />
+      )}
       <span className={`spine-title-wrap ${style === "label" ? "is-label" : ""}`}>
         <span className="spine-title" style={{ fontSize: size }}>
           {book.title}

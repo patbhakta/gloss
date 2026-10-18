@@ -2081,3 +2081,9 @@ button.starter-card:active {
     transition: opacity 0.2s ease;
   }
 }
+/* The feeling's face on a spine: centred, above the title. */
+.spine > span.spine-emoji {
+  left: 50%;
+  transform: translateX(-50%);
+  line-height: 1;
+}

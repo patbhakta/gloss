@@ -36,9 +36,9 @@ function textWidth(s: string) {
 }
 
 /** How wide a shelf label is, as drawn: its icon, its words, its count, and its padding. */
-const labelWidth = (l: { label: string; icon?: string; count: number }) => (l.icon ? 21 : 0) + textWidth(l.label) + 6 + textWidth(String(l.count)) + 17;
+const labelWidth = (l: { label: string; icon?: string; emoji?: string; count: number }) => (l.icon ? 21 : l.emoji ? 19 : 0) + textWidth(l.label) + 6 + textWidth(String(l.count)) + 17;
 
-type Label = { key: string; label: string; icon?: TopicKey | TagKey; x: number; row: number; count: number };
+type Label = { key: string; label: string; icon?: TopicKey | TagKey; emoji?: string; x: number; row: number; count: number };
 
 /**
  * Where every book stands: left to right along a plank, a gap between runs
@@ -78,7 +78,7 @@ function shelve(books: Book[], width: number, sort: Sort) {
   for (const run of runs) {
     const ws = run.books.map((b) => lookOf(b).w);
     const runW = ws.reduce((n, w) => n + w, 0) + GAP * (ws.length - 1);
-    const lw = run.g ? labelWidth({ label: run.g.label, icon: run.g.icon, count: run.books.length }) : 0;
+    const lw = run.g ? labelWidth({ label: run.g.label, icon: run.g.icon, emoji: run.g.emoji, count: run.books.length }) : 0;
     let x = PAD;
     if (used) {
       x = edge + GROUP_GAP;
@@ -109,7 +109,7 @@ function shelve(books: Book[], width: number, sort: Sort) {
       let left = (segStart + segEnd) / 2 - lw / 2;
       if (before) left = Math.max(left, before.x + labelWidth(before) + LABEL_GAP);
       left = Math.max(2, Math.min(inner - lw, left));
-      labels.push({ key: run.g.key, label: run.g.label, icon: run.g.icon, x: left, row: segRow, count: run.books.length });
+      labels.push({ key: run.g.key, label: run.g.label, icon: run.g.icon, emoji: run.g.emoji, x: left, row: segRow, count: run.books.length });
       if (row === segRow) labelEdge = left + lw;
     }
   }
@@ -200,7 +200,7 @@ export function Shelf({
         const style = { transform: `translate(${l.x}px, ${l.row * PITCH + AREA + PLANK + 8}px)` };
         const body = (
           <>
-            {l.icon && <Glyph k={l.icon} size={16} className="mr-[5px]" />}
+            {l.emoji ? <span aria-hidden className="mr-[4px] leading-none">{l.emoji}</span> : l.icon && <Glyph k={l.icon} size={16} className="mr-[5px]" />}
             {l.label}
             <span className="plank-n">{l.count}</span>
           </>

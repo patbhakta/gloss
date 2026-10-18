@@ -250,8 +250,8 @@ export function sortBooks(books: Book[], sort: Sort): Book[] {
 }
 
 /** The label on the shelf under the first book of each run: a topic, a month or a length. */
-export function groupOf(b: Book, sort: Sort): { key: string; label: string; icon?: TopicKey | TagKey } | null {
-  if (sort === "topic") return { key: b.topic, label: topicMeta(b.topic).name, icon: b.topic };
+export function groupOf(b: Book, sort: Sort): { key: string; label: string; icon?: TopicKey | TagKey; emoji?: string } | null {
+  if (sort === "topic") { const t = topicMeta(b.topic); return { key: b.topic, label: t.name, icon: t.emoji ? undefined : b.topic, emoji: t.emoji }; }
   if (sort === "recent") {
     const label = new Date(b.added).toLocaleDateString("en-GB", { month: "long", year: "numeric" });
     return { key: label, label };
