@@ -83,7 +83,7 @@ export async function POST(req: Request) {
   }
 
   const passages: string[] = [];
-  const sources: { id: string; title: string; snippet: string }[] = [];
+  const sources: { id: string; title: string; snippet: string; blockId?: string }[] = [];
   for (const h of hits) {
     const blocks = blocksOf.get(h.articleId) ?? [];
     const at = blocks.findIndex((b) => b.id === h.blockId);
@@ -95,7 +95,7 @@ export async function POST(req: Request) {
     if (!text) continue;
     const title = titleOf.get(h.articleId) ?? h.articleId;
     passages.push(`[Source: ${title}]\n${text}`);
-    if (!sources.some((s) => s.id === h.articleId)) sources.push({ id: h.articleId, title, snippet: h.snippet });
+    if (!sources.some((s) => s.id === h.articleId)) sources.push({ id: h.articleId, title, snippet: h.snippet, blockId: h.blockId });
   }
   if (passages.length === 0) {
     return Response.json({ answer: "I found the texts but could not open their pages for this one. Try again in a moment.", sources: [] });

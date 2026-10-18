@@ -1,0 +1,9 @@
+
+/* Citation jump flash: the chat's source chip lands the reader on the exact line */
+.citation-flash {
+  animation: citation-flash 2.4s ease-out 1;
+}
+@keyframes citation-flash {
+  0% { background: rgba(217, 119, 6, 0.22); }
+  100% { background: transparent; }
+}

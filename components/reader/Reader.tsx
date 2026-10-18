@@ -118,6 +118,24 @@ function ReaderInner({ article }: { article: Article }) {
   const [openHl, setOpenHl] = useState<OpenHighlight | null>(null);
   const [toast, setToast] = useState<null | { kind: "resume"; n: number } | { kind: "hint" }>(null);
 
+  // Citation jump: a #block-<id> hash from a chat source chip scrolls the
+  // exact line into view (and the browser highlight-anchor handles the rest).
+  useEffect(() => {
+    const jump = () => {
+      const h = decodeURIComponent(window.location.hash || "");
+      if (!h.startsWith("#block-")) return;
+      const el = document.getElementById(h.slice(1));
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.classList.add("citation-flash");
+        setTimeout(() => el.classList.remove("citation-flash"), 2400);
+      }
+    };
+    jump();
+    window.addEventListener("hashchange", jump);
+    return () => window.removeEventListener("hashchange", jump);
+  }, [articleId]);
+
   const glosses = useGlosses(articleId);
   const highlights = useHighlights(articleId);
   const activeGloss = useStore((s) => s.activeGloss);

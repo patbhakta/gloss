@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowUp, BookOpen, X } from "lucide-react";
 
-type Source = { id: string; title: string; snippet: string };
+type Source = { id: string; title: string; snippet: string; blockId?: string };
 type Turn = { role: "user" | "assistant"; content: string; sources?: Source[] };
 
 /**
@@ -104,7 +104,7 @@ export function VaultChat({ seed, onClose }: { seed: string; onClose: () => void
                   {t.sources.map((s) => (
                     <a
                       key={s.id}
-                      href={`/read/${s.id}`}
+                      href={`/read/${s.id}#block-${s.blockId}`}
                       className="flex items-center gap-1 rounded-full border border-edge px-2 py-0.5 text-[11px] text-ink-2 transition hover:bg-sunk"
                       title={s.snippet}
                     >

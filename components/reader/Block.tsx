@@ -207,6 +207,7 @@ function BlockImpl({ block, n, first, marks, activeGloss, hoverGloss, activeHigh
     <Tag
       className={`blk${first && !speakerLine ? " is-first" : ""}${cursor ? " is-cursor" : ""}`}
       data-block={block.id}
+      id={`block-${block.id}`}
       data-type={block.type}
       data-n={n}
     >
