@@ -359,7 +359,7 @@ export function Library() {
             </Chip>
             {topics.map(({ topic: t, books: bs }) => (
               <Chip key={t.key} on={only === t.key} color={t.shades[0]} onClick={() => setOnly(only === t.key ? null : t.key)}>
-                <Glyph k={t.key} size={18} /> {t.name} <span className="lib-n">{bs.length}</span>
+                {t.emoji ? <span aria-hidden className="leading-none">{t.emoji}</span> : <Glyph k={t.key} size={18} />} {t.name} <span className="lib-n">{bs.length}</span>
               </Chip>
             ))}
             {TAGS.some((t) => books.some(t.test)) && <span aria-hidden className="mx-1.5 h-4 w-px shrink-0 self-center bg-rule-strong" />}

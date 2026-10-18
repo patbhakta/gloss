@@ -46,6 +46,8 @@ export type Topic = {
   hint: string;
   /** The two inks, for a painted cover in this topic. */
   inks: string;
+  /** When a topic shows as an emoji instead of a clay figure (the feelings). */
+  emoji?: string;
 };
 
 export const TOPICS: Topic[] = [
@@ -73,16 +75,16 @@ export const TOPICS: Topic[] = [
   { key: "writing", name: "Writing", shades: ["#b0502d", "#cc7147", "#86381c", "#e6a580"], inks: "terracotta and burnt orange", hint: "writing, language, storytelling, journalism, communication", blurb: "Words, sentences and the craft of saying things clearly." },
   { key: "learning", name: "Learning", shades: ["#2c7a76", "#4c9b94", "#1c5654", "#8cc4bd"], inks: "deep teal and pale sea-green", hint: "education, learning, teaching, memory, tools for thought, note-taking", blurb: "How we learn, remember and think with tools." },
   { key: "living", name: "Living", shades: ["#b0841f", "#cda03a", "#835f15", "#e5c97a"], inks: "mustard ochre and olive green", hint: "life, relationships, attention, time, happiness, personal essays, food, travel", blurb: "Attention, time and the rest of life." },
-  { key: "happy", name: "Happy", shades: ["#b8862a", "#d9a84e", "#8a6218", "#ecd09a"], inks: "warm gold and amber", hint: "memories whose strongest feeling is happiness", blurb: "The happy ones." },
-  { key: "sad", name: "Sad", shades: ["#3d5a8a", "#5d7cad", "#273e63", "#9db4d4"], inks: "deep blue and slate", hint: "memories whose strongest feeling is sadness", blurb: "The sad ones." },
-  { key: "angry", name: "Angry", shades: ["#a43838", "#c65b5b", "#782323", "#e5a1a1"], inks: "brick red and rose", hint: "memories whose strongest feeling is anger", blurb: "The angry ones." },
-  { key: "anxious", name: "Anxious", shades: ["#6b4f8a", "#8b6fad", "#4a3563", "#c0a8d8"], inks: "violet and lilac", hint: "memories whose strongest feeling is anxiety or fear", blurb: "The anxious ones." },
-  { key: "surprise", name: "Surprise", shades: ["#2a8a7a", "#4aad9c", "#1a6355", "#9cd4c6"], inks: "teal and sea green", hint: "memories whose strongest feeling is surprise or realization", blurb: "The surprises." },
-  { key: "excited", name: "Excited", shades: ["#c96a1f", "#e08a3f", "#9c4f12", "#f2c28c"], inks: "bright orange and apricot", hint: "memories whose strongest feeling is excitement or anticipation", blurb: "The exciting ones." },
-  { key: "awkward", name: "Awkward", shades: ["#8a7f5a", "#ab9f76", "#635a3c", "#d4c9a4"], inks: "oatmeal and taupe", hint: "memories whose strongest feeling is awkwardness or embarrassment", blurb: "The awkward ones." },
-  { key: "tender", name: "Tender", shades: ["#c06a8a", "#d88ba8", "#94496a", "#efc0d2"], inks: "rose pink and blush", hint: "memories whose strongest feeling is love or affection", blurb: "The tender ones." },
-  { key: "determined", name: "Determined", shades: ["#4a5a2a", "#6a7f46", "#32401a", "#b0c48c"], inks: "moss green and olive", hint: "memories whose strongest feeling is determination", blurb: "The determined ones." },
-  { key: "calm", name: "Calm", shades: ["#5a7a6a", "#7a9c8a", "#3d584a", "#b4cfc2"], inks: "sage and mist green", hint: "memories whose strongest feeling is calm", blurb: "The calm ones." },
+  { key: "happy", name: "Happy", emoji: "😄", shades: ["#b8862a", "#d9a84e", "#8a6218", "#ecd09a"], inks: "warm gold and amber", hint: "memories whose strongest feeling is happiness", blurb: "The happy ones." },
+  { key: "sad", name: "Sad", emoji: "😢", shades: ["#3d5a8a", "#5d7cad", "#273e63", "#9db4d4"], inks: "deep blue and slate", hint: "memories whose strongest feeling is sadness", blurb: "The sad ones." },
+  { key: "angry", name: "Angry", emoji: "😠", shades: ["#a43838", "#c65b5b", "#782323", "#e5a1a1"], inks: "brick red and rose", hint: "memories whose strongest feeling is anger", blurb: "The angry ones." },
+  { key: "anxious", name: "Anxious", emoji: "😰", shades: ["#6b4f8a", "#8b6fad", "#4a3563", "#c0a8d8"], inks: "violet and lilac", hint: "memories whose strongest feeling is anxiety or fear", blurb: "The anxious ones." },
+  { key: "surprise", name: "Surprise", emoji: "😲", shades: ["#2a8a7a", "#4aad9c", "#1a6355", "#9cd4c6"], inks: "teal and sea green", hint: "memories whose strongest feeling is surprise or realization", blurb: "The surprises." },
+  { key: "excited", name: "Excited", emoji: "🤩", shades: ["#c96a1f", "#e08a3f", "#9c4f12", "#f2c28c"], inks: "bright orange and apricot", hint: "memories whose strongest feeling is excitement or anticipation", blurb: "The exciting ones." },
+  { key: "awkward", name: "Awkward", emoji: "😬", shades: ["#8a7f5a", "#ab9f76", "#635a3c", "#d4c9a4"], inks: "oatmeal and taupe", hint: "memories whose strongest feeling is awkwardness or embarrassment", blurb: "The awkward ones." },
+  { key: "tender", name: "Tender", emoji: "🥰", shades: ["#c06a8a", "#d88ba8", "#94496a", "#efc0d2"], inks: "rose pink and blush", hint: "memories whose strongest feeling is love or affection", blurb: "The tender ones." },
+  { key: "determined", name: "Determined", emoji: "💪", shades: ["#4a5a2a", "#6a7f46", "#32401a", "#b0c48c"], inks: "moss green and olive", hint: "memories whose strongest feeling is determination", blurb: "The determined ones." },
+  { key: "calm", name: "Calm", emoji: "😌", shades: ["#5a7a6a", "#7a9c8a", "#3d584a", "#b4cfc2"], inks: "sage and mist green", hint: "memories whose strongest feeling is calm", blurb: "The calm ones." },
   { key: "unsorted", name: "Unsorted", shades: ["#5d5a55", "#7b776f", "#3f3d39", "#aaa59b"], inks: "warm grey and charcoal", hint: "", blurb: "Not shelved yet. Gloss sorts new texts as they arrive." },
 ];
 
