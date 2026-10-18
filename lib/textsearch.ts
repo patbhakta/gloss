@@ -50,21 +50,49 @@ export async function searchTexts(userId: string, q: string): Promise<{ literal:
     [userId],
   )) as unknown as Row[];
 
+  // Literal, honest - but the query may be a whole sentence wrapping a quote:
+  // any "quoted fragment" inside it is searched on its own too.
+  const fragments = [query, ...query.match(/["“”']([^"“”']{6,})["“”']/g)?.map((m) => m.replace(/["“”']/g, "") ?? []) ?? []];
   const literal: Hit[] = paras
-    .filter((p) => p.text.toLowerCase().includes(query.toLowerCase()))
+    .filter((p) => fragments.some((f) => p.text.toLowerCase().includes(f.toLowerCase())))
     .slice(0, 8)
-    .map((p) => ({ articleId: p.article_id, blockId: p.block_id, snippet: snippet(p.text, query) }));
+    .map((p) => ({ articleId: p.article_id, blockId: p.block_id, snippet: snippet(p.text, fragments.find((f) => p.text.toLowerCase().includes(f.toLowerCase())) ?? query) }));
 
   const qv = await embed(query);
-  const semantic: Hit[] = qv
-    ? paras
-        .filter((p) => p.vec)
-        .map((p) => ({ p, s: cos(qv, p.vec!) }))
-        .filter((x) => x.s > 0.42)
-        .sort((a, b) => b.s - a.s)
-        .slice(0, 8)
-        .map((x) => ({ articleId: x.p.article_id, blockId: x.p.block_id, snippet: snippet(x.p.text, query), score: Math.round(x.s * 100) }))
-    : [];
+  let semantic: Hit[] = [];
+  if (qv) {
+    // Article-level score, tuned on the retrieval eval suite (Oct 18):
+    // best paragraph similarity + 0.3 x title similarity + 0.15 x content-word
+    // overlap. Titles are concrete on purpose - they carry the topic.
+    const titles = (await db().query(
+      "select article_id, vec from title_embeds where user_id = $1",
+      [userId],
+    )) as unknown as { article_id: string; vec: number[] }[];
+    const titleVec = new Map(titles.map((t) => [t.article_id, Array.from(t.vec ?? [])]));
+    const byArticle = new Map<string, { best: number; para: Row }>();
+    for (const p of paras) {
+      if (!p.vec) continue;
+      const s = cos(qv, p.vec);
+      const cur = byArticle.get(p.article_id);
+      if (!cur || s > cur.best) byArticle.set(p.article_id, { best: s, para: p });
+    }
+    const words = query.toLowerCase().match(/[a-z']+/g)?.filter((w) => w.length > 2 && !STOP.has(w)) ?? [];
+    const fullText = new Map<string, string>();
+    for (const p of paras) fullText.set(p.article_id, (fullText.get(p.article_id) ?? "") + " " + (p.text ?? "").toLowerCase());
+    const ranked = [...byArticle.entries()]
+      .map(([aid, { best, para }]) => {
+        const tv = titleVec.get(aid);
+        const tSim = tv && tv.length ? cos(qv, tv) : 0;
+        const text = fullText.get(aid) ?? "";
+        const kw = words.length ? words.filter((w) => text.includes(w)).length / words.length : 0;
+        return { aid, para, score: best + 0.3 * tSim + 0.15 * kw };
+      })
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 8);
+    semantic = ranked.map((x) => ({ articleId: x.aid, blockId: x.para.block_id, snippet: snippet(x.para.text, query), score: Math.round(x.score * 100) }));
+  }
 
   return { literal, semantic };
 }
+
+const STOP = new Set(["the", "a", "an", "of", "to", "in", "on", "at", "for", "with", "about", "and", "or", "is", "are", "was", "were", "be", "been", "do", "does", "did", "what", "which", "who", "whom", "whose", "when", "where", "why", "how", "that", "this", "these", "those", "it", "its", "his", "her", "their", "your", "my", "our", "you", "he", "she", "they", "we", "not", "no", "yes", "got", "get", "gets"]);
