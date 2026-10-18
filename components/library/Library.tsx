@@ -57,6 +57,7 @@ export function Library() {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState<{ id: string; origin: Origin } | null>(null);
   const [adding, setAdding] = useState<AddTab | null>(null);
+  const [asking, setAsking] = useState<string | null>(null);
   const [fresh, setFresh] = useState<Set<string>>(() => new Set());
   const [leaving, setLeaving] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -214,6 +215,13 @@ export function Library() {
 
   const fromAgent = useMemo(() => (lastSeen ? books.filter((b) => b.agent && b.added > lastSeen) : []), [books, lastSeen]);
 
+  // Search finds what's on the spines; Ask understands what's inside them.
+  // One box, two depths - never two places to type.
+  const askLib = useCallback(() => {
+    const seed = q.trim();
+    if (seed) setAsking(seed);
+  }, [q]);
+
   const go = useCallback((to: { view: View; topic?: TopicKey | null }) => {
     startTransition(() => {
       setView(to.view);
@@ -255,11 +263,16 @@ export function Library() {
   const searchBox = (
     <label className="lib-search">
       <Search size={15} className="shrink-0 text-ink-4" aria-hidden />
-      <input ref={searchRef} value={q} onChange={(e) => setQ(e.target.value)} placeholder={T ? `Search ${T.name}` : "Search the limbic"} aria-label="Search the limbic" />
+      <input ref={searchRef} value={q} onChange={(e) => setQ(e.target.value)} placeholder={T ? `Search or ask ${T.name}` : "Search or ask the limbic"} aria-label="Search or ask the limbic" onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); askLib(); } }} />
       {q ? (
-        <button type="button" aria-label="Clear search" onClick={() => setQ("")} className="grid size-5 place-items-center rounded-full text-ink-3 hover:bg-sunk">
-          <X size={13} />
-        </button>
+        <>
+          {q.trim() && !asking && (
+            <button type="button" onClick={askLib} className="whitespace-nowrap rounded-full bg-ink-1 px-2 py-0.5 text-[11px] text-paper" aria-label="Ask the library about this">Ask ⏎</button>
+          )}
+          <button type="button" aria-label="Clear search" onClick={() => setQ("")} className="grid size-5 place-items-center rounded-full text-ink-3 hover:bg-sunk">
+            <X size={13} />
+          </button>
+        </>
       ) : (
         <kbd className="max-sm:hidden">/</kbd>
       )}
@@ -340,7 +353,6 @@ export function Library() {
           <div className="lib-tools">
             <ViewSwitch view={view} onChange={(v) => go({ view: v })} />
             {searchBox}
-            <div className="pointer-events-none fixed bottom-4 right-4 z-40 max-md:bottom-3 max-md:right-3"><VaultChat /></div>
             {view === "shelf" && (
               <div className="lib-sort" role="radiogroup" aria-label="Arrange by">
                 <span className="px-2 text-[12.5px] text-ink-4 max-md:hidden">Arrange by</span>
@@ -458,6 +470,7 @@ export function Library() {
         />
       )}
       {adding && <AddPanel tab={adding} onTab={setAdding} onClose={() => setAdding(null)} signedIn={Boolean(isSignedIn)} />}
+      {asking !== null && <VaultChat seed={asking} onClose={() => setAsking(null)} />}
     </div>
   );
 }

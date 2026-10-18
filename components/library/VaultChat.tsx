@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowUp, BookOpen, MessageCircle, X } from "lucide-react";
+import { ArrowUp, BookOpen, X } from "lucide-react";
 
 type Source = { id: string; title: string; snippet: string };
 type Turn = { role: "user" | "assistant"; content: string; sources?: Source[] };
@@ -11,9 +11,9 @@ type Turn = { role: "user" | "assistant"; content: string; sources?: Source[] };
  * texts, each claim citing the text it was drawn from. This is the onboarding
  * layer - the same conversation, later, over WhatsApp/SMS/iMessage.
  */
-export function VaultChat() {
-  const [open, setOpen] = useState(false);
-  const [q, setQ] = useState("");
+export function VaultChat({ seed, onClose }: { seed: string; onClose: () => void }) {
+  const [q, setQ] = useState(seed);
+  const asked = useRef(seed);
   const [busy, setBusy] = useState(false);
   const [turns, setTurns] = useState<Turn[]>([]);
   const endRef = useRef<HTMLDivElement>(null);
@@ -21,6 +21,12 @@ export function VaultChat() {
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [turns, busy]);
+
+  // A seeded question from the search box asks itself once.
+  useEffect(() => {
+    if (asked.current) ask(asked.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const ask = async (question: string) => {
     const text = question.trim();
@@ -44,24 +50,13 @@ export function VaultChat() {
     }
   };
 
-  if (!open) {
-    return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-edge bg-paper px-3 py-1.5 text-[13px] text-ink-2 shadow-sm transition hover:bg-sunk"
-        aria-label="Chat with your library"
-      >
-        <MessageCircle size={14} aria-hidden /> Ask the library
-      </button>
-    );
-  }
-
   return (
-    <div className="pointer-events-auto flex h-[min(520px,70vh)] w-[min(400px,92vw)] flex-col overflow-hidden rounded-xl border border-edge bg-paper shadow-xl">
+    <div className="fixed inset-0 z-[80]" role="presentation">
+      <div className="absolute inset-0 bg-ink/20 backdrop-blur-[2px]" style={{ animation: "fade 0.2s both" }} onClick={onClose} />
+      <section role="dialog" aria-modal aria-label="Ask the library" className="add-panel">
       <div className="flex items-center justify-between border-b border-edge px-3 py-2">
         <span className="text-[13px] font-medium text-ink-1">The library answers from your texts only</span>
-        <button type="button" aria-label="Close chat" onClick={() => setOpen(false)} className="grid size-6 place-items-center rounded-full text-ink-3 hover:bg-sunk">
+        <button type="button" aria-label="Close chat" onClick={onClose} className="grid size-6 place-items-center rounded-full text-ink-3 hover:bg-sunk">
           <X size={14} />
         </button>
       </div>
@@ -112,6 +107,7 @@ export function VaultChat() {
           <ArrowUp size={14} />
         </button>
       </form>
+      </section>
     </div>
   );
 }
