@@ -59,6 +59,8 @@ export function Library() {
   const [adding, setAdding] = useState<AddTab | null>(null);
   const [asking, setAsking] = useState<string | null>(null);
   const [fresh, setFresh] = useState<Set<string>>(() => new Set());
+  // The kinda layer: vector-closest texts for a query nothing on the shelf matches.
+  const [semHits, setSemHits] = useState<{ id: string; title: string; snippet: string }[]>([]);
   const [leaving, setLeaving] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const known = useRef<Set<string> | null>(null);
@@ -183,14 +185,45 @@ export function Library() {
 
   const sorted = useMemo(() => sortBooks(books, sort), [books, sort]);
 
+/** Classic DP edit distance with an early out once past the budget. */
+function editsWithin(a: string, b: string, budget: number): boolean {
+  if (a === b) return true;
+  const m = a.length, n = b.length;
+  if (Math.abs(m - n) > budget) return false;
+  let prev = Array.from({ length: n + 1 }, (_, j) => j);
+  for (let i = 1; i <= m; i++) {
+    const cur = [i];
+    let best = i;
+    for (let j = 1; j <= n; j++) {
+      const v = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      cur[j] = v;
+      if (v < best) best = v;
+    }
+    if (best > budget) return false;
+    prev = cur;
+  }
+  return prev[n] <= budget;
+}
+
   const match = useCallback(
     (b: Book) => {
       const words = q.toLowerCase().trim().split(/\s+/).filter(Boolean);
       const t = tag ? TAGS.find((x) => x.key === tag)! : null;
-      return (!t || t.test(b)) && words.every((w) => `${b.title} ${b.author} ${topicMeta(b.topic).name} ${b.tags.join(" ")} ${b.year ?? ""}`.toLowerCase().includes(w));
+      if (t && !t.test(b)) return false;
+      // Exact first; then the kinda layer: a typo or two still matches
+      // (monika -> Monica). Edit distance over whole tokens, no model needed.
+      const hay = `${b.title} ${b.author} ${topicMeta(b.topic).name} ${b.tags.join(" ")} ${b.year ?? ""}`.toLowerCase();
+      const toks = hay.split(/[^a-z0-9]+/).filter(Boolean);
+      return words.every((w) => {
+        if (hay.includes(w)) return true;
+        if (w.length < 4) return false;
+        const allow = w.length >= 7 ? 2 : 1;
+        return toks.some((t2) => Math.abs(t2.length - w.length) <= allow && editsWithin(w, t2, allow));
+      });
     },
     [q, tag]
   );
+  const shownCount = hydrated ? books.filter(match).length : 0;
   const shown = useMemo(() => new Set(sorted.filter((b) => (!only || b.topic === only) && match(b)).map((b) => b.id)), [sorted, only, match]);
 
   const topics = useMemo(
@@ -214,6 +247,24 @@ export function Library() {
   }, [books, topics]);
 
   const fromAgent = useMemo(() => (lastSeen ? books.filter((b) => b.agent && b.added > lastSeen) : []), [books, lastSeen]);
+
+  useEffect(() => {
+    const t = setTimeout(async () => {
+      if (!q.trim() || q.trim().length < 3 || shownCount > 0) { setSemHits([]); return; }
+      try {
+        const r = await fetch("/api/search", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ q: q.trim() }) });
+        const d = await r.json();
+        const byId = new Map(books.map((b) => [b.id, b]));
+        const seen = new Set<string>();
+        const hits = [...(d.semantic ?? []), ...(d.literal ?? [])]
+          .filter((h: { articleId: string }) => { if (seen.has(h.articleId)) return false; seen.add(h.articleId); return byId.has(h.articleId); })
+          .slice(0, 4)
+          .map((h: { articleId: string; snippet: string }) => ({ id: h.articleId, title: byId.get(h.articleId)!.title, snippet: h.snippet }));
+        setSemHits(hits);
+      } catch { setSemHits([]); }
+    }, 350);
+    return () => clearTimeout(t);
+  }, [q, shownCount, books]);
 
   // Search finds what's on the spines; Ask understands what's inside them.
   // One box, two depths - never two places to type.
@@ -409,7 +460,21 @@ export function Library() {
                   />
                 )}
                 {hydrated && shown.size === 0 && books.length > 0 && (
-                  <p className="py-6 text-center text-[14px] text-ink-3">Nothing on the shelves matches{q ? <> &ldquo;{q}&rdquo;</> : ""}.</p>
+                  <div className="py-6 text-center">
+                    <p className="text-[14px] text-ink-3">Nothing on the shelves matches{q ? <> &ldquo;{q}&rdquo;</> : ""}.</p>
+                    {semHits.length > 0 && (
+                      <div className="mx-auto mt-3 max-w-md">
+                        <p className="text-[12.5px] text-ink-4">Closest inside your texts:</p>
+                        <div className="mt-1.5 flex flex-wrap justify-center gap-1.5">
+                          {semHits.map((h) => (
+                            <a key={h.id} href={`/read/${h.id}`} title={h.snippet} className="rounded-full border border-edge px-2.5 py-1 text-[12.5px] text-ink-2 transition hover:bg-sunk">
+                              {h.title}
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 )}
                 {hydrated && own.length < SAMPLES_UNTIL ? (
                   <Starter count={own.length} signedIn={Boolean(isSignedIn)} onAdd={setAdding} />
