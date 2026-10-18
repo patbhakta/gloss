@@ -34,17 +34,48 @@ export function VaultChat({ seed, onClose }: { seed: string; onClose: () => void
     setQ("");
     setTurns((t) => [...t, { role: "user", content: text }]);
     setBusy(true);
+    const history = turns.slice(-6).map((t) => ({ role: t.role, content: t.content }));
+    // Seed an empty assistant turn that fills in as the stream arrives.
+    setTurns((t) => [...t, { role: "assistant", content: "", sources: [] }]);
+    const append = (fn: (prev: string) => string, sources?: Source[]) =>
+      setTurns((t) => t.map((x, i) => (i === t.length - 1 && x.role === "assistant" ? { ...x, content: fn(x.content), sources: sources ?? x.sources } : x)));
     try {
-      const history = turns.slice(-6).map((t) => ({ role: t.role, content: t.content }));
       const r = await fetch("/api/vault-chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ q: text, history }),
       });
-      const d = await r.json();
-      setTurns((t) => [...t, { role: "assistant", content: d.answer || d.error || "No answer.", sources: d.sources }]);
+      const ctype = r.headers.get("content-type") ?? "";
+      if (!ctype.includes("x-ndjson")) {
+        // Early-exit path: plain JSON with a complete answer.
+        const d = await r.json();
+        append(() => d.answer || d.error || "No answer.", d.sources);
+        return;
+      }
+      const reader = r.body!.getReader();
+      const dec = new TextDecoder();
+      let buf = "";
+      let got = "";
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        let nl: number;
+        while ((nl = buf.indexOf("\n")) >= 0) {
+          const line = buf.slice(0, nl).trim();
+          buf = buf.slice(nl + 1);
+          if (!line) continue;
+          let ev: { sources?: Source[]; delta?: string; done?: boolean; empty?: boolean; error?: string };
+          try { ev = JSON.parse(line); } catch { continue; }
+          if (ev.sources) append((c) => c, ev.sources as Source[]);
+          else if (typeof ev.delta === "string" && ev.delta) { got += ev.delta; append(() => got); }
+          else if (typeof ev.error === "string" && ev.error) { const msg = ev.error; append(() => msg); }
+          else if (ev.empty && !got) append(() => "The model returned an empty answer. Try again.");
+        }
+      }
+      if (!got) append(() => "The library did not answer. Try again in a moment.");
     } catch {
-      setTurns((t) => [...t, { role: "assistant", content: "The library did not answer. Try again in a moment." }]);
+      append(() => "The library did not answer. Try again in a moment.");
     } finally {
       setBusy(false);
     }
@@ -85,7 +116,9 @@ export function VaultChat({ seed, onClose }: { seed: string; onClose: () => void
             </div>
           </div>
         ))}
-        {busy && <p className="text-[12px] text-ink-3">Reading the shelf…</p>}
+        {busy && !(turns.length > 0 && turns[turns.length - 1].role === "assistant" && turns[turns.length - 1].content) && (
+          <p className="text-[12px] text-ink-3">Reading the shelf…</p>
+        )}
         <div ref={endRef} />
       </div>
       <form

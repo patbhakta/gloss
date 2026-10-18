@@ -11,6 +11,10 @@ export const maxDuration = 120;
  * (literal + semantic, the same lane the shelf search uses), then an answer
  * composed ONLY from the retrieved passages, each citing the text it came
  * from. No web, no outside knowledge - the vault is the world.
+ *
+ * Streams NDJSON: {"sources":[...]} first, then {"delta":"..."} chunks as the
+ * answer is written, then {"done":true}. Early exits (no hits, bad body)
+ * return plain JSON for the client's fallback path.
  */
 
 type Body = { q?: string; history?: { role: "user" | "assistant"; content: string }[] };
@@ -73,21 +77,38 @@ export async function POST(req: Request) {
     return Response.json({ answer: "I found the texts but could not open their pages for this one. Try again in a moment.", sources: [] });
   }
 
-  // 3. Compose on the subscription lane (GLM flash via the existing client).
+  // 3. Compose on the subscription lane, streaming NDJSON to the client.
   const messages: ChatMessage[] = [
     { role: "system", content: SYSTEM },
     ...history.map((m) => ({ role: m.role, content: m.content } as ChatMessage)),
     { role: "user", content: `${q}\n\nPassages from the reader's library:\n\n${passages.join("\n\n---\n\n")}` },
   ];
 
-  let answer = "";
-  const usage: { prompt?: number; completion?: number } = {};
-  for await (const ev of streamChat({ messages, model: DEFAULT_MODEL })) {
-    if (ev.type === "content") answer += ev.text;
-    else if (ev.type === "usage") { usage.prompt = ev.usage.promptTokens; usage.completion = ev.usage.completionTokens; }
-    else if (ev.type === "error") return Response.json({ error: ev.text || "The model did not answer." }, { status: 502 });
-  }
-  if (!answer.trim()) return Response.json({ error: "The model returned an empty answer." }, { status: 502 });
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const send = (obj: unknown) => controller.enqueue(encoder.encode(JSON.stringify(obj) + "\n"));
+      send({ sources });
+      let answer = "";
+      try {
+        for await (const ev of streamChat({ messages, model: DEFAULT_MODEL })) {
+          if (ev.type === "content" && ev.text) {
+            answer += ev.text;
+            send({ delta: ev.text });
+          } else if (ev.type === "error") {
+            send({ error: ev.text || "The model did not answer." });
+          }
+        }
+        send({ done: true, empty: !answer.trim() });
+      } catch (e) {
+        send({ error: "The model did not answer. Try again in a moment." });
+      } finally {
+        controller.close();
+      }
+    },
+  });
 
-  return Response.json({ answer: answer.trim(), sources, usage });
+  return new Response(stream, {
+    headers: { "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-store", "X-Accel-Buffering": "no" },
+  });
 }
