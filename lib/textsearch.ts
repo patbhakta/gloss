@@ -42,6 +42,20 @@ function snippet(text: string, q: string): string {
   return (start > 0 ? "…" : "") + text.slice(start, start + 140).trim();
 }
 
+const titleCache = new Map<string, Map<string, string>>();
+async function titlesFor(userId: string): Promise<Map<string, string>> {
+  let m = titleCache.get(userId);
+  if (!m) {
+    m = new Map();
+    try {
+      const t = (await db().query("select id, data->>'title' as title from articles where user_id = $1 and deleted = false", [userId])) as unknown as { id: string; title?: string }[];
+      for (const r of t) m!.set(r.id, r.title ?? r.id);
+    } catch {}
+    titleCache.set(userId, m);
+  }
+  return m;
+}
+
 export async function searchTexts(userId: string, q: string): Promise<{ literal: Hit[]; semantic: Hit[] }> {
   const query = q.trim();
   if (query.length < 2) return { literal: [], semantic: [] };
@@ -66,6 +80,12 @@ export async function searchTexts(userId: string, q: string): Promise<{ literal:
     // overlap. Titles are concrete on purpose - they carry the topic.
     const titles = (await db().query(
       "select article_id, vec from title_embeds where user_id = $1",
+      [userId],
+    )) as unknown as { article_id: string; vec: number[] }[];
+    // Whole-article vectors (title + opening text): topical questions match
+    // the scene as a unit far better than any single line (eval Oct 19).
+    const arts = (await db().query(
+      "select article_id, vec from article_embeds where user_id = $1",
       [userId],
     )) as unknown as { article_id: string; vec: number[] }[];
     const titleVec = new Map(titles.map((t) => [t.article_id, Array.from(t.vec ?? [])]));
@@ -94,10 +114,12 @@ export async function searchTexts(userId: string, q: string): Promise<{ literal:
     // retriever is never buried by the other two.
     const rank = (arr: typeof entries, key: (e: (typeof entries)[number]) => number) =>
       [...arr].sort((a, b) => key(b) - key(a)).map((e) => e.aid);
+    const artVec = new Map(arts.map((a) => [a.article_id, Array.from(a.vec ?? [])]));
     const lists: { ids: string[]; weight: number }[] = [
       { ids: rank(entries, (e) => e.paraScore), weight: 1 },
       { ids: rank(entries, (e) => e.tSim), weight: 0.5 },
       { ids: rank(entries, (e) => e.kw), weight: 0.3 },
+      { ids: rank(entries, (e) => { const v = artVec.get(e.aid); return v && v.length ? cos(qv!, v) : 0; }), weight: 1.2 },
     ];
     const K = 20; // grid-searched on the 90-question eval (Oct 19)
     const fused = new Map<string, number>();
@@ -108,11 +130,32 @@ export async function searchTexts(userId: string, q: string): Promise<{ literal:
       });
       if (l.ids[0]) listTop.add(l.ids[0]);
     }
-    const ranked = [...fused.entries()]
+    // Cross-encoder rerank of the fused top-20 (in-house service, CPU). The
+    // model reads the actual passage text, which embeddings-only ranking
+    // cannot; if the service is down we keep RRF order (never fail search).
+    const fusedRanked = [...fused.entries()]
       .map(([aid, score]) => ({ aid, score, e: entries.find((x) => x.aid === aid)! }))
       .filter((x) => x.e)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 8);
+      .sort((a, b) => b.score - a.score);
+    const cand = fusedRanked.slice(0, 40);
+    let ranked = cand.slice(0, 8);
+    try {
+      const rr = await fetch("http://127.0.0.1:8430/rerank", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ q: query, passages: await Promise.all(cand.map(async (c) => `${(await titlesFor(userId)).get(c.aid) ?? c.aid}\n${(c.e.para.text ?? "").slice(0, 700)}`)) }),
+        signal: AbortSignal.timeout(2500),
+      });
+      if (rr.ok) {
+        const { scores } = (await rr.json()) as { scores: number[] };
+        const sig = (x: number) => 1 / (1 + Math.exp(-Math.max(-10, Math.min(10, x))));
+        ranked = cand
+          .map((c, i) => ({ c, s: sig(scores[i] ?? -10) + 0.8 / (1 + fusedRanked.findIndex((f) => f.aid === c.aid)) }))
+          .sort((a, b) => b.s - a.s)
+          .slice(0, 8)
+          .map((x) => x.c);
+      }
+    } catch {}
     // guaranteed slots: any list's #1 missing from the top-8 displaces rank 8
     for (const aid of listTop) {
       if (!ranked.some((r) => r.aid === aid)) {
