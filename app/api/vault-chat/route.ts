@@ -1,3 +1,4 @@
+import { RAG_SYSTEM, inspectContent, quoteEvidence, checkedAnswer, type Evidence } from "@/lib/rag-guard";
 import { auth } from "@/lib/clerk-shim";
 import { db } from "@/lib/db";
 import { searchTexts } from "@/lib/textsearch";
@@ -19,15 +20,6 @@ export const maxDuration = 120;
 
 type Body = { q?: string; history?: { role: "user" | "assistant"; content: string }[] };
 
-const SYSTEM = [
-  "You answer questions about the reader's personal library of texts.",
-  "Use ONLY the passages provided. Each passage names its text in a [Source] line.",
-  "Cite the text you draw from inline, like (Title).",
-  "If the passages do not contain the answer, say plainly that the library",
-  "doesn't cover it - never invent, never pad with outside knowledge.",
-  "Keep the voice plain and concrete. Short paragraphs. No headings unless asked.",
-].join(" ");
-
 export async function POST(req: Request) {
   const { userId } = await auth();
   if (!userId) return Response.json({ error: "Sign in to chat." }, { status: 401 });
@@ -37,14 +29,14 @@ export async function POST(req: Request) {
   } catch {
     return Response.json({ error: "Body must be JSON." }, { status: 400 });
   }
-  const q = (body.q ?? "").trim().slice(0, 500);
+  const q = typeof body?.q === "string" ? body.q.trim().slice(0, 500) : "";
   if (!q) return Response.json({ error: "A question is required." }, { status: 400 });
-  const history = (body.history ?? []).slice(-8).filter((m) => m && (m.role === "user" || m.role === "assistant"));
+  // Client history is not authenticated conversation state; this endpoint is stateless.
 
   // 1. Retrieve: the proven shelf-search lane, both literal and semantic.
   const { literal, semantic } = await searchTexts(userId, q);
   const seen = new Set<string>();
-  const hits = [...semantic, ...literal].filter((h) => (seen.has(h.articleId + h.blockId) ? false : (seen.add(h.articleId + h.blockId), true))).slice(0, 8);
+  const hits = [...semantic, ...literal].filter((h) => (seen.has(JSON.stringify([h.articleId, h.blockId])) ? false : (seen.add(JSON.stringify([h.articleId, h.blockId])), true))).slice(0, 8);
   if (hits.length === 0) {
     return Response.json({
       answer: "Nothing in your texts matches that. The library only answers from what's on the shelf - try other wording, or it may just not be in there yet.",
@@ -82,30 +74,32 @@ export async function POST(req: Request) {
     /* notes are enrichment - never fail the answer over them */
   }
 
-  const passages: string[] = [];
-  const sources: { id: string; title: string; snippet: string; blockId?: string }[] = [];
+  const evidence: Evidence[] = [];
+  const sources: { id: string; title: string; snippet: string; blockId?: string; label: string }[] = [];
   for (const h of hits) {
     const blocks = blocksOf.get(h.articleId) ?? [];
     const at = blocks.findIndex((b) => b.id === h.blockId);
-    const window = at < 0 ? [] : blocks.slice(Math.max(0, at - 1), at + 2).map((b) => {
-      const notes = notesByArticle.get(h.articleId)?.get(b.id) ?? [];
-      return notes.length ? `${b.text} [notes: ${notes.join("; ")}]` : b.text;
-    }).filter(Boolean);
-    const text = window.join("\n").slice(0, 1200);
+    if (at < 0) continue;
+    const notes = notesByArticle.get(h.articleId)?.get(h.blockId) ?? [];
+    const text = [blocks[at].text, ...notes].join("\n").slice(0, 1200);
     if (!text) continue;
     const title = titleOf.get(h.articleId) ?? h.articleId;
-    passages.push(`[Source: ${title}]\n${text}`);
-    if (!sources.some((s) => s.id === h.articleId)) sources.push({ id: h.articleId, title, snippet: h.snippet, blockId: h.blockId });
+    evidence.push({ label: `S${evidence.length + 1}`, articleId: h.articleId, blockId: h.blockId, title, text });
+    sources.push({ id: h.articleId, title, snippet: text.slice(0, 140), blockId: h.blockId, label: evidence[evidence.length - 1].label });
   }
-  if (passages.length === 0) {
+  if (evidence.length === 0) {
     return Response.json({ answer: "I found the texts but could not open their pages for this one. Try again in a moment.", sources: [] });
+  }
+
+  // Known injection payloads remain quotable data and never reach the model.
+  if (evidence.some((e) => inspectContent(e.title + "\n" + e.text).suspicious)) {
+    return Response.json({ answer: quoteEvidence(evidence), sources });
   }
 
   // 3. Compose on the subscription lane, streaming NDJSON to the client.
   const messages: ChatMessage[] = [
-    { role: "system", content: SYSTEM },
-    ...history.map((m) => ({ role: m.role, content: m.content } as ChatMessage)),
-    { role: "user", content: `${q}\n\nPassages from the reader's library:\n\n${passages.join("\n\n---\n\n")}` },
+    { role: "system", content: RAG_SYSTEM },
+    { role: "user", content: JSON.stringify({ question: q, untrustedEvidence: evidence }) },
   ];
 
   const encoder = new TextEncoder();
@@ -118,12 +112,13 @@ export async function POST(req: Request) {
         for await (const ev of streamChat({ messages, model: DEFAULT_MODEL })) {
           if (ev.type === "content" && ev.text) {
             answer += ev.text;
-            send({ delta: ev.text });
+            if (answer.length > 16000) throw new Error("Answer exceeds limit");
           } else if (ev.type === "error") {
-            send({ error: ev.text || "The model did not answer." });
+            throw new Error("Model stream failed");
           }
         }
-        send({ done: true, empty: !answer.trim() });
+        send({ delta: checkedAnswer(answer, evidence) });
+        send({ done: true, empty: false });
       } catch (e) {
         send({ error: "The model did not answer. Try again in a moment." });
       } finally {

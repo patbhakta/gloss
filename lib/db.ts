@@ -1,3 +1,4 @@
+import { inspectContent } from "./rag-guard";
 /**
  * Postgres on Neon, over its HTTP driver: one round trip per query, no pool
  * to manage in serverless functions. Server-side only.
@@ -113,7 +114,12 @@ export async function pushRows(userId: string, changes: Partial<Record<Collectio
     for (const r of rows) {
       const added = Number((r.data as { addedAt?: number } | undefined)?.addedAt ?? Number.POSITIVE_INFINITY);
       if (!r.deleted && t === "articles" && added < SHELF_RESET_MS) (revert[t as Collection] ??= []).push(r.id);
-      else ok.push(r);
+      else {
+        if (!r.deleted && (t === "articles" || t === "highlights")) {
+          r.data = { ...(r.data as Record<string, unknown>), contentGuard: inspectContent(JSON.stringify([r.data, r.doc])) };
+        }
+        ok.push(r);
+      }
     }
     if (ok.length) admitted[t as Collection] = ok;
   }
@@ -222,6 +228,6 @@ export async function shelveForUser(userId: string, item: { id: string }, doc: u
   await db().query(
     `insert into articles (user_id, id, article_id, data, doc, deleted, updated_at) values ($1, $2, $2, $3, $4, false, now())
      on conflict (user_id, id) do update set data = excluded.data, doc = excluded.doc, deleted = false, updated_at = now()`,
-    [userId, item.id, JSON.stringify(item), JSON.stringify(doc)]
+    [userId, item.id, JSON.stringify({ ...item, contentGuard: inspectContent(JSON.stringify([item, doc])) }), JSON.stringify(doc)]
   );
 }
