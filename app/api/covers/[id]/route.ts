@@ -1,11 +1,12 @@
 import { auth } from "@clerk/nextjs/server";
+import { authApi } from "@/lib/clerk-shim";
 import { loadCover } from "@/lib/db";
 
 export const runtime = "nodejs";
 
 /** A cover painted on another device, from the reader's account. */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { userId } = await auth();
+  const { userId } = await authApi();
   if (!userId) return Response.json({ error: "Sign in to sync." }, { status: 401 });
   const jpeg = await loadCover(userId, (await params).id);
   if (!jpeg) return Response.json({ error: "Not found." }, { status: 404 });

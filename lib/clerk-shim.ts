@@ -6,7 +6,7 @@
  * persona's limbic never mixes with anyone else's. No Clerk keys at runtime.
  */
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 
 export const LOCAL_USER_ID = "pat";
 
@@ -21,6 +21,23 @@ export async function auth(): Promise<{ userId: string | null }> {
   const limbic = jar.get("limbic")?.value ?? "";
   const userId = LIMBICS.some((l) => l.id === limbic) ? limbic : LOCAL_USER_ID;
   return { userId };
+}
+
+/**
+ * API tenant resolution, strict: the `limbic` cookie or an X-Tenant-ID header,
+ * validated against the persona whitelist. NO silent fallback — an unknown,
+ * missing or disagreeing tenant reads as anonymous (401 at the caller), so a
+ * stale cookie can never quietly read Pat's shelf. A cookie/header mismatch is
+ * flagged so the caller can answer 403.
+ */
+export async function authApi(): Promise<{ userId: string | null; conflict?: boolean }> {
+  const jar = await cookies();
+  const hdrs = await headers();
+  const fromCookie = jar.get("limbic")?.value ?? "";
+  const fromHeader = hdrs.get("x-tenant-id")?.toLowerCase() ?? "";
+  if (fromCookie && fromHeader && fromCookie !== fromHeader) return { userId: null, conflict: true };
+  const t = fromHeader || fromCookie;
+  return { userId: LIMBICS.some((l) => l.id === t) ? t : null };
 }
 
 export async function currentUser(): Promise<unknown> {

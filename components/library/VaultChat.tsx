@@ -15,6 +15,7 @@ export function VaultChat({ seed, onClose }: { seed: string; onClose: () => void
   const [q, setQ] = useState(seed);
   const asked = useRef(seed);
   const [busy, setBusy] = useState(false);
+  const [guard, setGuard] = useState<string[]>([]);
   const [turns, setTurns] = useState<Turn[]>([]);
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -34,6 +35,7 @@ export function VaultChat({ seed, onClose }: { seed: string; onClose: () => void
     setQ("");
     setTurns((t) => [...t, { role: "user", content: text }]);
     setBusy(true);
+    setGuard([]);
     const history = turns.slice(-6).map((t) => ({ role: t.role, content: t.content }));
     // Seed an empty assistant turn that fills in as the stream arrives.
     setTurns((t) => [...t, { role: "assistant", content: "", sources: [] }]);

@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { auth } from "@/lib/clerk-shim";
+import { authApi } from "@/lib/clerk-shim";
 import { db } from "@/lib/db";
 /** A block id, in the reader's own alphabet. */
 const uid = () => Math.random().toString(36).slice(2, 8);
@@ -24,7 +24,7 @@ type Datapoint = {
  * editable note on the right.
  */
 export async function POST() {
-  const { userId } = await auth();
+  const { userId } = await authApi();
   if (!userId) return Response.json({ error: "Sign in to shelve the baseline." }, { status: 401 });
 
   const raw = await readFile(path.join(process.cwd(), "data/ei-vault.json"), "utf8");
