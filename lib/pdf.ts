@@ -226,19 +226,35 @@ const interlude = (b: Block) => b.type !== "p" || text(b).length < 260;
  */
 export function stitchBlocks(blocks: Block[]): Block[] {
   const out: Block[] = [];
+  // Tables split across a page boundary come back as two blocks; the second
+  // part has no header of its own. Same column count + no header + no page
+  // break between them (the segment split already handles that) = one table.
   for (const b of blocks) {
-    if (b.type === "p" && /^[a-z(\[]/.test(text(b).trimStart())) {
-      let at = out.length - 1;
-      while (at >= 0 && out.length - at <= LOOKBACK && interlude(out[at])) at--;
-      const prev = at >= 0 && out.length - at <= LOOKBACK ? out[at] : null;
-      if (prev?.type === "p" && !/[.!?:;"”’)\]]\s*$/.test(text(prev))) {
-        out[at] = { ...prev, runs: [...prev.runs, { text: " " }, ...b.runs] };
-        continue;
-      }
+    const prev = out[out.length - 1];
+    if (
+      b.type === "table" && prev?.type === "table" &&
+      !b.head && b.rows?.length &&
+      prev.rows?.length && prev.rows[0]?.length === b.rows[0]?.length
+    ) {
+      out[out.length - 1] = { ...prev, rows: [...(prev.rows ?? []), ...(b.rows ?? [])] };
+      continue;
     }
     out.push(b);
   }
-  return out;
+  const stitched: Block[] = [];
+  for (const b of out) {
+    if (b.type === "p" && /^[a-z(\[]/.test(text(b).trimStart())) {
+      let at = stitched.length - 1;
+      while (at >= 0 && stitched.length - at <= LOOKBACK && interlude(stitched[at])) at--;
+      const prev = at >= 0 && stitched.length - at <= LOOKBACK ? stitched[at] : null;
+      if (prev?.type === "p" && !/[.!?:;"”’)\]]\s*$/.test(text(prev))) {
+        stitched[at] = { ...prev, runs: [...prev.runs, { text: " " }, ...b.runs] };
+        continue;
+      }
+    }
+    stitched.push(b);
+  }
+  return stitched;
 }
 
 /** A rendered page, shrunk and re-encoded as JPEG, so a scan at full resolution is not megabytes on the wire. */
