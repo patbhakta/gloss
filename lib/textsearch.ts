@@ -56,8 +56,9 @@ async function titlesFor(userId: string): Promise<Map<string, string>> {
   return m;
 }
 
-export async function searchTexts(userId: string, q: string): Promise<{ literal: Hit[]; semantic: Hit[] }> {
+export async function searchTexts(userId: string, q: string): Promise<{ literal: Hit[]; semantic: Hit[]; topScore?: number }> {
   const query = q.trim();
+  let topScore: number | undefined;
   if (query.length < 2) return { literal: [], semantic: [] };
   const paras = (await db().query(
     "select article_id, block_id, text, vec from para_embeds where user_id = $1",
@@ -115,12 +116,32 @@ export async function searchTexts(userId: string, q: string): Promise<{ literal:
     const rank = (arr: typeof entries, key: (e: (typeof entries)[number]) => number) =>
       [...arr].sort((a, b) => key(b) - key(a)).map((e) => e.aid);
     const artVec = new Map(arts.map((a) => [a.article_id, Array.from(a.vec ?? [])]));
+    // Scene-plot lane (HU-3247): Emory plot summaries paraphrase-match far
+    // better than any single transcript line; flat rows, disposable like the rest.
+    let plotVec = new Map<string, number[]>();
+    const plotText = new Map<string, string>();
+    try {
+      const plots = (await db().query(
+        "select article_id, vec, text from plot_embeds where user_id = $1",
+        [userId],
+      )) as unknown as { article_id: string; vec: number[]; text?: string }[];
+      for (const p of plots) {
+        plotVec.set(p.article_id, Array.from(p.vec ?? []));
+        if (p.text) plotText.set(p.article_id, p.text);
+      }
+    } catch {}
     const lists: { ids: string[]; weight: number }[] = [
       { ids: rank(entries, (e) => e.paraScore), weight: 1 },
       { ids: rank(entries, (e) => e.tSim), weight: 0.5 },
       { ids: rank(entries, (e) => e.kw), weight: 0.3 },
       { ids: rank(entries, (e) => { const v = artVec.get(e.aid); return v && v.length ? cos(qv!, v) : 0; }), weight: 1.2 },
     ];
+    // Paraphrase queries (no quoted fragment) get the plot lane in fusion;
+    // quote-bearing queries stay on literal/para evidence - the plot vector
+    // shifts fusion ranks and buries exact-line matches (eval v8c, HU-3247).
+    if (fragments.length < 2) {
+      lists.push({ ids: rank(entries, (e) => { const v = plotVec.get(e.aid); return v && v.length ? cos(qv!, v) : 0; }), weight: 0.8 });
+    }
     const K = 20; // grid-searched on the 90-question eval (Oct 19)
     const fused = new Map<string, number>();
     const listTop = new Set<string>();
@@ -137,23 +158,32 @@ export async function searchTexts(userId: string, q: string): Promise<{ literal:
       .map(([aid, score]) => ({ aid, score, e: entries.find((x) => x.aid === aid)! }))
       .filter((x) => x.e)
       .sort((a, b) => b.score - a.score);
-    const cand = fusedRanked.slice(0, 40);
+    const cand = fusedRanked.slice(0, 24);
     let ranked = cand.slice(0, 8);
     try {
       const rr = await fetch("http://127.0.0.1:8430/rerank", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ q: query, passages: await Promise.all(cand.map(async (c) => `${(await titlesFor(userId)).get(c.aid) ?? c.aid}\n${(c.e.para.text ?? "").slice(0, 700)}`)) }),
-        signal: AbortSignal.timeout(2500),
+        body: JSON.stringify({ q: query, passages: await Promise.all(cand.map(async (c) => {
+          const plot = plotText.get(c.aid);
+          // Quote in the query and in this passage? Literal evidence - never
+          // dilute it. Plot is scene-rescue context for candidates whose best
+          // line doesn't carry the quote (HU-3247 eval).
+          const paraTxt = c.e.para.text ?? "";
+          const quotedHit = fragments.some((f) => paraTxt.toLowerCase().includes(f.toLowerCase()));
+          const plotSuffix = plot && !quotedHit ? `\nPlot: ${plot.slice(0, 300)}` : "";
+          return `${(await titlesFor(userId)).get(c.aid) ?? c.aid}\n${paraTxt.slice(0, quotedHit ? 700 : 500)}${plotSuffix}`;
+        })) }),
+        signal: AbortSignal.timeout(6000),
       });
       if (rr.ok) {
         const { scores } = (await rr.json()) as { scores: number[] };
         const sig = (x: number) => 1 / (1 + Math.exp(-Math.max(-10, Math.min(10, x))));
-        ranked = cand
+        const blended = cand
           .map((c, i) => ({ c, s: sig(scores[i] ?? -10) + 0.8 / (1 + fusedRanked.findIndex((f) => f.aid === c.aid)) }))
-          .sort((a, b) => b.s - a.s)
-          .slice(0, 8)
-          .map((x) => x.c);
+          .sort((a, b) => b.s - a.s);
+        topScore = blended[0]?.s;
+        ranked = blended.slice(0, 8).map((x) => x.c);
       }
     } catch {}
     // guaranteed slots: any list's #1 missing from the top-8 displaces rank 8
@@ -166,7 +196,7 @@ export async function searchTexts(userId: string, q: string): Promise<{ literal:
     semantic = ranked.slice(0, 8).map((x) => ({ articleId: x.aid, blockId: x.e.para.block_id, snippet: snippet(x.e.para.text, query), score: Math.round(x.score * 1000) }));
   }
 
-  return { literal, semantic };
+  return { literal, semantic, topScore };
 }
 
 const STOP = new Set(["the", "a", "an", "of", "to", "in", "on", "at", "for", "with", "about", "and", "or", "is", "are", "was", "were", "be", "been", "do", "does", "did", "what", "which", "who", "whom", "whose", "when", "where", "why", "how", "that", "this", "these", "those", "it", "its", "his", "her", "their", "your", "my", "our", "you", "he", "she", "they", "we", "not", "no", "yes", "got", "get", "gets"]);
