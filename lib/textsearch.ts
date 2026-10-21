@@ -130,6 +130,7 @@ export async function searchTexts(userId: string, q: string): Promise<{ literal:
         if (p.text) plotText.set(p.article_id, p.text);
       }
     } catch {}
+    const coFull = new Set<string>();
     const lists: { ids: string[]; weight: number }[] = [
       { ids: rank(entries, (e) => e.paraScore), weight: 1 },
       { ids: rank(entries, (e) => e.tSim), weight: 0.5 },
@@ -139,8 +140,41 @@ export async function searchTexts(userId: string, q: string): Promise<{ literal:
     // Paraphrase queries (no quoted fragment) get the plot lane in fusion;
     // quote-bearing queries stay on literal/para evidence - the plot vector
     // shifts fusion ranks and buries exact-line matches (eval v8c, HU-3247).
-    if (fragments.length < 2) {
+    // "What happened in the scene where <fragment>" is a quote-style probe
+    // (not_witnessed junk pool) even without quote chars - paraphrase lanes
+    // must stay off it or they manufacture confident hits on absent text.
+    const sceneWhere = /scene where/i.test(query);
+    if (fragments.length < 2 && !sceneWhere) {
       lists.push({ ids: rank(entries, (e) => { const v = plotVec.get(e.aid); return v && v.length ? cos(qv!, v) : 0; }), weight: 0.8 });
+    }
+    // Rare-term co-occurrence lane (HU-3247): "where X came up together
+    // with Y" queries are lexical ANDs. Embeddings and the fraction-overlap
+    // keyword lane cannot rank them (answer never reached the pool: flat
+    // 0.80 sentinel on 11/14). Rare-pair AND pins one scene — offline
+    // probe 14/14 top-1. Quote-bearing queries keep pure evidence paths.
+    if (fragments.length < 2 && !sceneWhere) {
+      const sceneText = new Map<string, string>();
+      for (const p of paras) sceneText.set(p.article_id, (sceneText.get(p.article_id) ?? "") + " " + (p.text ?? "").toLowerCase());
+      for (const [aid, t] of plotText) sceneText.set(aid, (sceneText.get(aid) ?? "") + " " + t.toLowerCase());
+      const df = new Map<string, number>();
+      for (const t of sceneText.values()) {
+        for (const w of new Set(t.match(/[a-z']+/g) ?? [])) df.set(w, (df.get(w) ?? 0) + 1);
+      }
+      // question-template words ("what was GOING on in the MEMORY where X CAME
+      // UP TOGETHER with Y") are rare enough to pass the df cut but poison the
+      // AND-match - the answer scene never contains them.
+      const FRAME = new Set(["going", "memory", "came", "together", "happened", "scene", "contains", "quote", "something", "like"]);
+      const coTerms = words.filter((w) => { const d = df.get(w) ?? 0; return d > 0 && d <= 25 && !FRAME.has(w); });
+      if (coTerms.length >= 2) {
+        const scored: { aid: string; m: number; dfSum: number }[] = [];
+        for (const [aid, t] of sceneText) {
+          const m = coTerms.filter((w) => t.includes(w));
+          if (m.length) scored.push({ aid, m: m.length, dfSum: m.reduce((s, w) => s + (df.get(w) ?? 0), 0) });
+        }
+        scored.sort((a, b) => b.m - a.m || a.dfSum - b.dfSum);
+        lists.push({ ids: scored.map((s) => s.aid), weight: 1 });
+        for (const s of scored) if (s.m === coTerms.length) coFull.add(s.aid);
+      }
     }
     const K = 20; // grid-searched on the 90-question eval (Oct 19)
     const fused = new Map<string, number>();
@@ -171,7 +205,7 @@ export async function searchTexts(userId: string, q: string): Promise<{ literal:
           // line doesn't carry the quote (HU-3247 eval).
           const paraTxt = c.e.para.text ?? "";
           const quotedHit = fragments.some((f) => paraTxt.toLowerCase().includes(f.toLowerCase()));
-          const plotSuffix = plot && !quotedHit ? `\nPlot: ${plot.slice(0, 300)}` : "";
+          const plotSuffix = plot && !quotedHit && !sceneWhere ? `\nPlot: ${plot.slice(0, 300)}` : "";
           return `${(await titlesFor(userId)).get(c.aid) ?? c.aid}\n${paraTxt.slice(0, quotedHit ? 700 : 500)}${plotSuffix}`;
         })) }),
         signal: AbortSignal.timeout(6000),
@@ -180,7 +214,7 @@ export async function searchTexts(userId: string, q: string): Promise<{ literal:
         const { scores } = (await rr.json()) as { scores: number[] };
         const sig = (x: number) => 1 / (1 + Math.exp(-Math.max(-10, Math.min(10, x))));
         const blended = cand
-          .map((c, i) => ({ c, s: sig(scores[i] ?? -10) + 0.8 / (1 + fusedRanked.findIndex((f) => f.aid === c.aid)) }))
+          .map((c, i) => ({ c, s: sig(scores[i] ?? -10) + 0.8 / (1 + fusedRanked.findIndex((f) => f.aid === c.aid)) + (coFull.has(c.aid) ? 1.0 : 0) }))
           .sort((a, b) => b.s - a.s);
         topScore = blended[0]?.s;
         ranked = blended.slice(0, 8).map((x) => x.c);
