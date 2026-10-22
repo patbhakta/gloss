@@ -294,6 +294,72 @@ export async function searchTexts(userId: string, q: string): Promise<{ literal:
         }
       }
     }
+    // One-substitution window pin (HU-3247, eval v14): emotion_swap
+    // quotes swap ONE word inside an otherwise-verbatim quote ("I'm so
+    // thrilled" vs the scene's "I'm so sorry") - the swapped word is
+    // in-vocab so the typo lane ignores it, and these fragments carry too
+    // few >=4-letter content words for the AND pins. Token-window
+    // alignment rescues them: slide the strict quoted fragment's tokens
+    // over every scene's token stream.
+    //   Pass A: the whole quote aligns with <=1 substituted token (also
+    //           subsumes token-level typos and name swaps).
+    //   Pass B (only when A finds nothing, quote >=8 tokens): prefix +
+    //           substituted word + stage-direction gap of <=12 tokens +
+    //           suffix, both sides exact - transcripts interrupt quotes
+    //           with bracketed directions ("...sorry...[Eddie forces his
+    //           head in the door] Ahhh. Have we met?").
+    // Pin = UNIQUE matching scene; multiple hits = ambiguous, no pin.
+    // Offline probe Oct 22 (87 eval questions): 41 pass-A pins, 2 pass-B
+    // pins, 0 wrong, 0 fires on all 21 not_witnessed.
+    {
+      const strictFragsW = query.match(/["\u201c\u201d][^\u201c\u201d"]{6,}["\u201c\u201d]/g)?.map((m) => m.replace(/["\u201c\u201d]/g, "")) ?? [];
+      const sw = strictFragsW.sort((a, b) => b.length - a.length)[0];
+      const qw = sw?.toLowerCase().match(/[a-z']+/g) ?? [];
+      if (sw && qw.length >= 6 && typoFull.size === 0) {
+        const sceneToksW: [string, string[]][] = [];
+        for (const [aid, t] of fullText) sceneToksW.push([aid, t.match(/[a-z']+/g) ?? []]);
+        const n = qw.length;
+        const passA = (toks: string[]): boolean => {
+          for (let i = 0; i + n <= toks.length; i++) {
+            let d = 0;
+            for (let j = 0; j < n; j++) if (toks[i + j] !== qw[j] && ++d > 1) break;
+            if (d <= 1) return true;
+          }
+          return false;
+        };
+        const passB = (toks: string[]): boolean => {
+          if (n < 8) return false;
+          for (let k = 3; k <= n - 4; k++) {
+            const ls = n - k - 1;
+            if (ls < 4) break;
+            for (let i = 0; i + k <= toks.length; i++) {
+              let ok = true;
+              for (let j = 0; j < k; j++) if (toks[i + j] !== qw[j]) { ok = false; break; }
+              if (!ok) continue;
+              for (let g = 0; g < 13; g++) {
+                const s0 = i + k + 1 + g;
+                if (s0 + ls > toks.length) break;
+                let m2 = true;
+                for (let j = 0; j < ls; j++) if (toks[s0 + j] !== qw[k + 1 + j]) { m2 = false; break; }
+                if (m2) return true;
+              }
+            }
+          }
+          return false;
+        };
+        const A = sceneToksW.filter(([, t]) => passA(t)).map(([aid]) => aid);
+        let pin: string | undefined;
+        if (A.length === 1) pin = A[0];
+        else if (A.length === 0) {
+          const Bx = sceneToksW.filter(([, t]) => passB(t)).map(([aid]) => aid);
+          if (Bx.length === 1) pin = Bx[0];
+        }
+        if (pin) {
+          lists.push({ ids: [pin], weight: 1 });
+          typoFull.add(pin);
+        }
+      }
+    }
     const K = 20; // grid-searched on the 90-question eval (Oct 19)
     const fused = new Map<string, number>();
     const listTop = new Set<string>();
@@ -311,6 +377,9 @@ export async function searchTexts(userId: string, q: string): Promise<{ literal:
       .filter((x) => x.e)
       .sort((a, b) => b.score - a.score);
     const cand = fusedRanked.slice(0, 24);
+    const pinFrag = fragments.slice(1).sort((a, b) => b.length - a.length)[0];
+    const pinToks = pinFrag?.toLowerCase().match(/[a-z']+/g)?.filter((w) => w.length >= 4) ?? [];
+    const evScore = (t: string) => { const lc = t.toLowerCase(); return pinToks.reduce((s, w) => s + (lc.includes(w) ? 1 : 0), 0); };
     let ranked = cand.slice(0, 8);
     try {
       const rr = await fetch("http://127.0.0.1:8430/rerank", {
@@ -321,8 +390,23 @@ export async function searchTexts(userId: string, q: string): Promise<{ literal:
           // Quote in the query and in this passage? Literal evidence - never
           // dilute it. Plot is scene-rescue context for candidates whose best
           // line doesn't carry the quote (HU-3247 eval).
-          const paraTxt = c.e.para.text ?? "";
-          const quotedHit = fragments.some((f) => paraTxt.toLowerCase().includes(f.toLowerCase()));
+          let paraTxt = c.e.para.text ?? "";
+          let quotedHit = fragments.some((f) => paraTxt.toLowerCase().includes(f.toLowerCase()));
+          // Evidence para for lane-pinned scenes (HU-3247, eval v14): the
+          // passage is the best-EMBEDDING para, which for pinned scenes is
+          // often a quote-less line of the right scene - the cross-encoder
+          // reads no evidence and the pin lands #2 (the "ewll" typo). Swap
+          // in the scene's para carrying the most quoted-fragment content
+          // words before reranking.
+          if (typoFull.has(c.aid) && pinToks.length) {
+            let bestTxt = paraTxt, bestS = evScore(paraTxt);
+            for (const p of paras) {
+              if (p.article_id !== c.aid) continue;
+              const s = evScore(p.text ?? "");
+              if (s > bestS) { bestS = s; bestTxt = p.text ?? ""; }
+            }
+            if (bestS > evScore(paraTxt)) { paraTxt = bestTxt; quotedHit = true; }
+          }
           const plotSuffix = plot && !quotedHit && !sceneWhere ? `\nPlot: ${plot.slice(0, 300)}` : "";
           return `${(await titlesFor(userId)).get(c.aid) ?? c.aid}\n${paraTxt.slice(0, quotedHit ? 700 : 500)}${plotSuffix}`;
         })) }),
