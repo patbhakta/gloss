@@ -165,12 +165,30 @@ export async function searchTexts(userId: string, q: string): Promise<{ literal:
       // UP TOGETHER with Y") are rare enough to pass the df cut but poison the
       // AND-match - the answer scene never contains them.
       const FRAME = new Set(["going", "memory", "came", "together", "happened", "scene", "contains", "quote", "something", "like"]);
-      const coTerms = words.filter((w) => { const d = df.get(w) ?? 0; return d > 0 && d <= 25 && !FRAME.has(w); });
+      // Prefix-tolerant df matching (HU-3247, eval v15): a co-occurrence
+      // term can arrive truncated ("inviting came up together with livin" -
+      // corpus token is "livin'", df 0 for the bare stem) and the d>0 gate
+      // silently dropped it, leaving coTerms short of the AND. Expand df==0
+      // stems (len>=4) to corpus words sharing the prefix (suffix <=3 chars)
+      // that INDIVIDUALLY pass the rarity cut - common continuations
+      // ("living", df 141) stay out, rare ones ("livin'", df 2) come in.
+      // Offline probe Oct 22: 15/15 paraphrase pins correct (was 14), 0
+      // wrong pins, 0 pins on private queries.
+      const coTerms: { alts: string[]; df: number }[] = [];
+      for (const w of words) {
+        if (FRAME.has(w)) continue;
+        const d = df.get(w) ?? 0;
+        if (d > 0 && d <= 25) coTerms.push({ alts: [w], df: d });
+        else if (d === 0 && w.length >= 4) {
+          const alts = [...df.keys()].filter((v) => v.startsWith(w) && v.length <= w.length + 3 && (df.get(v) ?? 0) <= 25 && (df.get(v) ?? 0) > 0);
+          if (alts.length) coTerms.push({ alts, df: alts.reduce((s, a) => s + (df.get(a) ?? 0), 0) });
+        }
+      }
       if (coTerms.length >= 2) {
         const scored: { aid: string; m: number; dfSum: number }[] = [];
         for (const [aid, t] of sceneText) {
-          const m = coTerms.filter((w) => t.includes(w));
-          if (m.length) scored.push({ aid, m: m.length, dfSum: m.reduce((s, w) => s + (df.get(w) ?? 0), 0) });
+          const m = coTerms.filter((c) => c.alts.some((a) => t.includes(a)));
+          if (m.length) scored.push({ aid, m: m.length, dfSum: m.reduce((s, c) => s + c.df, 0) });
         }
         scored.sort((a, b) => b.m - a.m || a.dfSum - b.dfSum);
         lists.push({ ids: scored.map((s) => s.aid), weight: 1 });
