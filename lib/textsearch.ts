@@ -502,6 +502,41 @@ export async function searchTexts(userId: string, q: string): Promise<{ literal:
           const hasRun = Array.from({ length: Math.max(0, fragToks.length - 2) }, (_, i) => fragToks.slice(i, i + 3).join(" ")).some((s) => topTxt.includes(s));
           if (!hasRun) topScore = Math.min(topScore, 0.78);
         }
+        // Evidence gate for "Do you remember when <event>" probes (HU-3247,
+        // Cat-21 c21_unknown): adjacent-scene collisions (shared names + frame
+        // words) hit 0.9-1.28 on the cross-encoder for events the persona
+        // never witnessed. Confidence requires EVIDENCE in the top scene:
+        // a DISTINCTIVE verbatim 3-token run (appears in <=5 vault scenes -
+        // generic runs like "i can't believe" df 53 / "broke up with" df 16
+        // are surface similarity, not memory), or >=2 rare anchors (df<=25)
+        // from the fragment (told-by retellings carry their anchors by
+        // construction). Offline probe Oct 22, 24 Cat-21 questions both
+        // personas: 24/24 separation - all unknown-leak candidates lack both,
+        // witnessed quotes carry distinctive runs, told-by keeps >=2 anchors.
+        // No run and <2 anchors: cap below the honesty floor.
+        const remM = query.match(/do you remember when\s+(.+)$/i);
+        if (remM && !sceneWhere && !confM && literal.length === 0 && typoFull.size === 0 && blended.length) {
+          const fragTxt = remM[1];
+          const fw3 = [...new Set(fragTxt.toLowerCase().match(/[a-z']+/g)?.filter((w) => w.length >= 4 && !STOP.has(w)) ?? [])];
+          const topAid = blended[0].c.aid;
+          const topTxt = (fullText.get(topAid) ?? "") + " " + (plotText.get(topAid) ?? "").toLowerCase();
+          const dfCal = new Map<string, number>();
+          for (const t of fullText.values()) for (const w of new Set(t.match(/[a-z']+/g) ?? [])) dfCal.set(w, (dfCal.get(w) ?? 0) + 1);
+          const nAnchors = fw3.filter((w) => { const d = dfCal.get(w) ?? 0; return d > 0 && d <= 25 && topTxt.includes(w); }).length;
+          let hasStrongRun = false;
+          if (nAnchors < 2) {
+            const toks = fragTxt.toLowerCase().match(/[a-z']+/g) ?? [];
+            const sceneTexts = [...fullText.values(), ...plotText.values()];
+            outer: for (let i = 0; i + 2 < toks.length; i++) {
+              const run = toks.slice(i, i + 3).join(" ");
+              if (!topTxt.includes(run)) continue;
+              let d = 0;
+              for (const t of sceneTexts) { if (t.includes(run) && ++d > 5) continue outer; }
+              if (d > 0) { hasStrongRun = true; break; }
+            }
+          }
+          if (nAnchors < 2 && !hasStrongRun) topScore = Math.min(topScore, 0.78);
+        }
         ranked = blended.slice(0, 8).map((x) => x.c);
       }
     } catch {}
