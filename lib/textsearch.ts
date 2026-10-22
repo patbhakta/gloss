@@ -67,7 +67,11 @@ export async function searchTexts(userId: string, q: string): Promise<{ literal:
 
   // Literal, honest - but the query may be a whole sentence wrapping a quote:
   // any "quoted fragment" inside it is searched on its own too.
-  const fragments = [query, ...query.match(/["“”']([^"“”']{6,})["“”']/g)?.map((m) => m.replace(/["“”']/g, "") ?? []) ?? []];
+  // Apostrophes are NOT quote delimiters (HU-3247): contractions/possessives
+  // ("couldn't discuss the shelter's") paired into a phantom "quoted fragment"
+  // that silently disabled the co-occurrence lane on apostrophe-heavy queries.
+  // Eval probe Oct 22: 0 questions rely on single-quote fragments; 1 un-phantomed.
+  const fragments = [query, ...query.match(/["“”]([^"“”]{6,})["“”]/g)?.map((m) => m.replace(/["“”]/g, "") ?? []) ?? []];
   const literal: Hit[] = paras
     .filter((p) => fragments.some((f) => p.text.toLowerCase().includes(f.toLowerCase())))
     .slice(0, 8)
@@ -177,6 +181,17 @@ export async function searchTexts(userId: string, q: string): Promise<{ literal:
       const coTerms: { alts: string[]; df: number }[] = [];
       for (const w of words) {
         if (FRAME.has(w)) continue;
+        // Possessive-normalized df lookup (HU-3247): a possessive query term
+        // ("the shelter's truth") never matches the corpus token ("shelter")
+        // and the d>0 gate dropped the strongest anchor in the query. Try the
+        // stripped form alongside; the rare form wins the cut.
+        const cands = w.endsWith("'s") ? [w, w.slice(0, -2)] : [w];
+        let hit = false;
+        for (const c of cands) {
+          const d = df.get(c) ?? 0;
+          if (d > 0 && d <= 25) { coTerms.push({ alts: cands, df: d }); hit = true; break; }
+        }
+        if (hit) continue;
         const d = df.get(w) ?? 0;
         if (d > 0 && d <= 25) coTerms.push({ alts: [w], df: d });
         else if (d === 0 && w.length >= 4) {
@@ -184,7 +199,11 @@ export async function searchTexts(userId: string, q: string): Promise<{ literal:
           if (alts.length) coTerms.push({ alts, df: alts.reduce((s, a) => s + (df.get(a) ?? 0), 0) });
         }
       }
-      if (coTerms.length >= 2) {
+      // Ultra-rare singleton anchor (HU-3247): a df<=3 term is effectively a
+      // unique scene identifier - alone it still pins. Rescues private
+      // "shelter/chick" (shelter df=1); probe Oct 22: only fire in the eval,
+      // zero collateral pins.
+      if (coTerms.length >= 2 || (coTerms.length === 1 && coTerms[0].df <= 3)) {
         const scored: { aid: string; m: number; dfSum: number }[] = [];
         for (const [aid, t] of sceneText) {
           const m = coTerms.filter((c) => c.alts.some((a) => t.includes(a)));
