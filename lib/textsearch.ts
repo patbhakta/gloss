@@ -226,6 +226,31 @@ export async function searchTexts(userId: string, q: string): Promise<{ literal:
             lists.push({ ids: scored.map((s) => s.aid), weight: 1 });
             for (const s of scored) typoFull.add(s.aid);
           }
+        } else if (mistyped.length === 0) {
+          // Clean-quote pin lane (HU-3247, eval v12): person_swap quotes
+          // (names swapped in the question) carry zero mistyped words, so
+          // the typo gate skips them - yet their content-word AND pins
+          // exactly ONE scene. Fire the pin when the exact-match pool is
+          // a single scene and the fragment carries >=5 DISTINCT content
+          // words. Two firewalls (Oct 22 probe, 19/19 correct / 0 wrong):
+          // (a) distinct-word floor - short all-common fragments (4 words:
+          // "messed okay nervous really") word-scatter onto a single wrong
+          // scene (emotion_swap danger, v11 q71);
+          // (b) STRICT double-quote extraction only - the loose fragment
+          // regex above treats apostrophes as delimiters, so quotes like
+          // "I'd hate to..." get mangled into a fragment bleeding past the
+          // quote into question text and pinned the wrong scene (v12 q72
+          // regression); a properly-quoted span never bleeds.
+          const strictFrags = query.match(/["“”][^“”"]{6,}["“”]/g)?.map((m) => m.replace(/["“”]/g, "")) ?? [];
+          const strict = strictFrags.sort((a, b) => b.length - a.length)[0];
+          const fw2 = [...new Set(strict?.toLowerCase().match(/[a-z']+/g)?.filter((w) => w.length >= 4) ?? [])];
+          if (strict && fw2.length >= 5) {
+            const pool = [...sceneTok.entries()].filter(([, toks]) => fw2.every((w) => toks.has(w)));
+            if (pool.length === 1) {
+              lists.push({ ids: [pool[0][0]], weight: 1 });
+              typoFull.add(pool[0][0]);
+            }
+          }
         }
       }
     }
