@@ -190,7 +190,17 @@ export async function searchTexts(userId: string, q: string): Promise<{ literal:
     {
       const frag = fragments.slice(1).sort((a, b) => b.length - a.length)[0];
       const fw = frag?.toLowerCase().match(/[a-z']+/g)?.filter((w) => w.length >= 4) ?? [];
-      if (frag && fw.length >= 4) {
+      // Gate widening (HU-3247, eval v13): the loose fragment regex treats
+      // apostrophes as delimiters, so a quote opening with a contraction
+      // ("Rachel, what're you...") truncates to 2 content words and starved
+      // the clean-quote lane even though the STRICT fragment carries 9. The
+      // block now opens when the strict double-quoted fragment alone carries
+      // >=5 content words (the clean lane's own floor) - the typo lane below
+      // still requires its own fw >= 4, so its behavior is unchanged.
+      const strictFrags0 = query.match(/["“”][^“”"]{6,}["“”]/g)?.map((m) => m.replace(/["“”]/g, "")) ?? [];
+      const strict0 = strictFrags0.sort((a, b) => b.length - a.length)[0];
+      const strictFw0 = strict0?.toLowerCase().match(/[a-z']+/g)?.filter((w) => w.length >= 4) ?? [];
+      if (frag && (fw.length >= 4 || strictFw0.length >= 5)) {
         const sceneTok = new Map<string, Set<string>>();
         const vocab = new Set<string>();
         for (const [aid, t] of fullText) {
@@ -199,7 +209,7 @@ export async function searchTexts(userId: string, q: string): Promise<{ literal:
           for (const w of s) vocab.add(w);
         }
         const mistyped = fw.filter((w) => !vocab.has(w));
-        if (mistyped.length >= 1 && mistyped.length <= 2) {
+        if (fw.length >= 4 && mistyped.length >= 1 && mistyped.length <= 2) {
           const variants = (w: string): Set<string> => {
             const out = new Set<string>();
             for (let i = 0; i < w.length; i++) out.add(w.slice(0, i) + w.slice(i + 1));
@@ -249,6 +259,36 @@ export async function searchTexts(userId: string, q: string): Promise<{ literal:
             if (pool.length === 1) {
               lists.push({ ids: [pool[0][0]], weight: 1 });
               typoFull.add(pool[0][0]);
+            } else if (pool.length === 0) {
+              // Name-relaxed retry (HU-3247, eval v13): person_swap questions
+              // swap a character name inside an otherwise-verbatim quote
+              // ("Rachel, what're you..." vs the scene's "Ross, what're
+              // you..."), so the strict AND pins nothing. Retry with
+              // proper-cased corpus speaker names dropped from the AND set.
+              // Fires only when a name word was actually dropped, >=5
+              // distinct words remain, and the relaxed AND pins exactly ONE
+              // scene. Offline probe Oct 22: 3 relaxed pins (all person_swap,
+              // all correct), 0 wrong pins, 19/19 strict pins unchanged.
+              const speakerCount = new Map<string, number>();
+              for (const p of paras) {
+                const m = (p.text ?? "").match(/^\s*([A-Z][a-z]+(?: [A-Z][a-z]+)?):\s/);
+                if (m) { const k = m[1].toLowerCase(); speakerCount.set(k, (speakerCount.get(k) ?? 0) + 1); }
+              }
+              const isSpeakerName = (w: string) =>
+                [...speakerCount.entries()].some(([s, c]) => c >= 3 && (s === w || s.split(" ").includes(w)));
+              const proper = new Set(
+                (strict.match(/[A-Za-z']+/g) ?? [])
+                  .filter((t) => /^[A-Z][a-z']+$/.test(t))
+                  .map((t) => t.toLowerCase()),
+              );
+              const noname = fw2.filter((w) => !proper.has(w) || !isSpeakerName(w));
+              if (fw2.length - noname.length > 0 && noname.length >= 5) {
+                const pool2 = [...sceneTok.entries()].filter(([, toks]) => noname.every((w) => toks.has(w)));
+                if (pool2.length === 1) {
+                  lists.push({ ids: [pool2[0][0]], weight: 1 });
+                  typoFull.add(pool2[0][0]);
+                }
+              }
             }
           }
         }
