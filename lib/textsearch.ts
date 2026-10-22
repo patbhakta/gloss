@@ -437,6 +437,30 @@ export async function searchTexts(userId: string, q: string): Promise<{ literal:
           .map((c, i) => ({ c, s: sig(scores[i] ?? -10) + 0.8 / (1 + fusedRanked.findIndex((f) => f.aid === c.aid)) + (coFull.has(c.aid) ? 1.0 : 0) + (typoFull.has(c.aid) ? 1.0 : 0) }))
           .sort((a, b) => b.s - a.s);
         topScore = blended[0]?.s;
+        // Honest-miss calibration for scene-where probes (HU-3247, eval v16):
+        // "What happened in the scene where <junk quote>" (no quote chars) is
+        // a quote probe - sceneWhere already keeps the paraphrase lanes off
+        // it. With no pin fired and nothing literal, confidence may only come
+        // from quote EVIDENCE in the top scene: a rare word (df<=25) from the
+        // fragment, or a verbatim 3-word run. Junk fragments built from common
+        // words score 1.08-1.61 on cross-encoder surface similarity alone
+        // ("no, no! give it to me!" -> "Oh no-no-no-no!"). Common-word
+        // similarity is not memory - cap it below the honesty floor so the
+        // persona says "I wasn't there". Offline probe Oct 22: caps both
+        // confident junk hits, 0 anchor-less real quotes affected (19/19
+        // passing not_witnessed keep anchors or phrases).
+        if (sceneWhere && literal.length === 0 && typoFull.size === 0 && blended.length) {
+          const fragTxt = query.replace(/^.*?scene where/i, "");
+          const fw3 = [...new Set(fragTxt.toLowerCase().match(/[a-z']+/g)?.filter((w) => w.length >= 4 && !STOP.has(w)) ?? [])];
+          const topAid = blended[0].c.aid;
+          const topTxt = fullText.get(topAid) ?? "";
+          const dfCal = new Map<string, number>();
+          for (const t of fullText.values()) for (const w of new Set(t.match(/[a-z']+/g) ?? [])) dfCal.set(w, (dfCal.get(w) ?? 0) + 1);
+          const hasAnchor = fw3.some((w) => { const d = dfCal.get(w) ?? 0; return d > 0 && d <= 25 && topTxt.includes(w); });
+          const toks = fragTxt.toLowerCase().match(/[a-z']+/g) ?? [];
+          const hasPhrase = Array.from({ length: Math.max(0, toks.length - 2) }, (_, i) => toks.slice(i, i + 3).join(" ")).some((s) => topTxt.includes(s));
+          if (!hasAnchor && !hasPhrase) topScore = Math.min(topScore, 0.78);
+        }
         ranked = blended.slice(0, 8).map((x) => x.c);
       }
     } catch {}
