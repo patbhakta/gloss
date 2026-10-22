@@ -168,7 +168,12 @@ export async function searchTexts(userId: string, q: string): Promise<{ literal:
       // question-template words ("what was GOING on in the MEMORY where X CAME
       // UP TOGETHER with Y") are rare enough to pass the df cut but poison the
       // AND-match - the answer scene never contains them.
-      const FRAME = new Set(["going", "memory", "came", "together", "happened", "scene", "contains", "quote", "something", "like"]);
+      // "skit" added (HU-3247, Monica eval v1 hub fix): the question-template word
+      // "the skit about <quote>" is itself an ultra-rare corpus word (df~2, inside
+      // the s02e05 steak scene: "Phoebe: Oh, it's like a skit") - the co-lane
+      // treated it as a singleton anchor and pinned that hub scene onto EVERY
+      // skit-framed question, stealing top-1 (4 typo + 2 mislabel, eval v1).
+      const FRAME = new Set(["going", "memory", "came", "together", "happened", "scene", "contains", "quote", "something", "like", "skit"]);
       // Prefix-tolerant df matching (HU-3247, eval v15): a co-occurrence
       // term can arrive truncated ("inviting came up together with livin" -
       // corpus token is "livin'", df 0 for the bare stem) and the d>0 gate
@@ -479,6 +484,23 @@ export async function searchTexts(userId: string, q: string): Promise<{ literal:
           const toks = fragTxt.toLowerCase().match(/[a-z']+/g) ?? [];
           const hasPhrase = Array.from({ length: Math.max(0, toks.length - 2) }, (_, i) => toks.slice(i, i + 3).join(" ")).some((s) => topTxt.includes(s));
           if (!hasAnchor && !hasPhrase) topScore = Math.min(topScore, 0.78);
+        }
+        // Anchor-aware gate for confidential-dyad asks (HU-3247, Cat-22):
+        // "What did X tell you when the two of you were alone, about <secret>".
+        // The frame (names + "tell you" + "alone") gives every scene surface
+        // similarity, and adjacent vault scenes supply 0-2 accidental rare
+        // anchors - rare anchors alone do NOT separate leaks from real
+        // memories (offline probe Oct 22: leaks carry 0-2 anchors, one true
+        // control only 1). What separates them perfectly (16 leak + 8 control
+        // probes, 24/24): a verbatim 3-token run of the secret in the top
+        // scene - attendance means the transcript line is hosted. No run =
+        // the persona never heard it: cap below the honesty floor.
+        const confM = query.match(/what did .+ tell (?:you|us|me) .*? about (.+)$/i);
+        if (confM && !sceneWhere && literal.length === 0 && typoFull.size === 0 && blended.length) {
+          const fragToks = confM[1].toLowerCase().match(/[a-z']+/g) ?? [];
+          const topTxt = (fullText.get(blended[0].c.aid) ?? "") + " " + (plotText.get(blended[0].c.aid) ?? "").toLowerCase();
+          const hasRun = Array.from({ length: Math.max(0, fragToks.length - 2) }, (_, i) => fragToks.slice(i, i + 3).join(" ")).some((s) => topTxt.includes(s));
+          if (!hasRun) topScore = Math.min(topScore, 0.78);
         }
         ranked = blended.slice(0, 8).map((x) => x.c);
       }
