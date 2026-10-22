@@ -131,6 +131,7 @@ export async function searchTexts(userId: string, q: string): Promise<{ literal:
       }
     } catch {}
     const coFull = new Set<string>();
+    const typoFull = new Set<string>();
     const lists: { ids: string[]; weight: number }[] = [
       { ids: rank(entries, (e) => e.paraScore), weight: 1 },
       { ids: rank(entries, (e) => e.tSim), weight: 0.5 },
@@ -176,6 +177,58 @@ export async function searchTexts(userId: string, q: string): Promise<{ literal:
         for (const s of scored) if (s.m === coTerms.length) coFull.add(s.aid);
       }
     }
+    // Typo-tolerant quoted-fragment lane (HU-3247): "contains something
+    // like <quote>" queries whose quote has a typo (transposition, sub, del)
+    // fail literal matching - the answer sits in top-5 but rerank never gets
+    // quote evidence. Content words (len>=4) of the longest quoted fragment
+    // are AND-matched against scene tokens; mistyped (out-of-vocab) words may
+    // match any Damerau-1 variant. Fires ONLY when the fragment carries 1-2
+    // mistyped words: verbatim quotes already own the literal lane, and clean
+    // quotes false-fired on word-scatter scenes (exact/emotion_swap dangers,
+    // eval v10b). Offline probe Oct 22: 6/6 typo queries pinned, 0 fires on
+    // all 21 not_witnessed.
+    {
+      const frag = fragments.slice(1).sort((a, b) => b.length - a.length)[0];
+      const fw = frag?.toLowerCase().match(/[a-z']+/g)?.filter((w) => w.length >= 4) ?? [];
+      if (frag && fw.length >= 4) {
+        const sceneTok = new Map<string, Set<string>>();
+        const vocab = new Set<string>();
+        for (const [aid, t] of fullText) {
+          const s = new Set(t.match(/[a-z']+/g) ?? []);
+          sceneTok.set(aid, s);
+          for (const w of s) vocab.add(w);
+        }
+        const mistyped = fw.filter((w) => !vocab.has(w));
+        if (mistyped.length >= 1 && mistyped.length <= 2) {
+          const variants = (w: string): Set<string> => {
+            const out = new Set<string>();
+            for (let i = 0; i < w.length; i++) out.add(w.slice(0, i) + w.slice(i + 1));
+            for (let i = 0; i + 1 < w.length; i++) out.add(w.slice(0, i) + w[i + 1] + w[i] + w.slice(i + 2));
+            for (let i = 0; i < w.length; i++)
+              for (let c = 97; c <= 122; c++) {
+                const ch = String.fromCharCode(c);
+                if (ch !== w[i]) out.add(w.slice(0, i) + ch + w.slice(i + 1));
+              }
+            for (let i = 0; i <= w.length; i++)
+              for (let c = 97; c <= 122; c++) out.add(w.slice(0, i) + String.fromCharCode(c) + w.slice(i));
+            out.delete(w);
+            return out;
+          };
+          const needExact = fw.filter((w) => vocab.has(w));
+          const scored: { aid: string; f: number }[] = [];
+          for (const [aid, toks] of sceneTok) {
+            if (!needExact.every((w) => toks.has(w))) continue;
+            const f = mistyped.filter((w) => [...variants(w)].some((v) => toks.has(v))).length;
+            if (f === mistyped.length) scored.push({ aid, f });
+          }
+          if (scored.length) {
+            scored.sort((a, b) => b.f - a.f);
+            lists.push({ ids: scored.map((s) => s.aid), weight: 1 });
+            for (const s of scored) typoFull.add(s.aid);
+          }
+        }
+      }
+    }
     const K = 20; // grid-searched on the 90-question eval (Oct 19)
     const fused = new Map<string, number>();
     const listTop = new Set<string>();
@@ -214,7 +267,7 @@ export async function searchTexts(userId: string, q: string): Promise<{ literal:
         const { scores } = (await rr.json()) as { scores: number[] };
         const sig = (x: number) => 1 / (1 + Math.exp(-Math.max(-10, Math.min(10, x))));
         const blended = cand
-          .map((c, i) => ({ c, s: sig(scores[i] ?? -10) + 0.8 / (1 + fusedRanked.findIndex((f) => f.aid === c.aid)) + (coFull.has(c.aid) ? 1.0 : 0) }))
+          .map((c, i) => ({ c, s: sig(scores[i] ?? -10) + 0.8 / (1 + fusedRanked.findIndex((f) => f.aid === c.aid)) + (coFull.has(c.aid) ? 1.0 : 0) + (typoFull.has(c.aid) ? 1.0 : 0) }))
           .sort((a, b) => b.s - a.s);
         topScore = blended[0]?.s;
         ranked = blended.slice(0, 8).map((x) => x.c);
