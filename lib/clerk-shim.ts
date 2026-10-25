@@ -14,6 +14,11 @@ export const LOCAL_USER_ID = "pat";
 export const LIMBICS = [
   { id: LOCAL_USER_ID, label: "Pat" },
   { id: "chandler", label: "Chandler" },
+  { id: "monica", label: "Monica" },
+  { id: "joey", label: "Joey" },
+  { id: "rachel", label: "Rachel" },
+  { id: "phoebe", label: "Phoebe" },
+  { id: "ross", label: "Ross" },
 ] as const;
 
 export async function auth(): Promise<{ userId: string | null }> {
