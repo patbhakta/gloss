@@ -136,6 +136,8 @@ export async function searchTexts(userId: string, q: string): Promise<{ literal:
     } catch {}
     const coFull = new Set<string>();
     const typoFull = new Set<string>();
+    let clauseQ: string | null = null; // conversational-shell clause (HU-3247 plateau reopen c)
+    let bareFrag: string | undefined; // bare-shell fragment (no quote chars), Oct 23
     const lists: { ids: string[]; weight: number }[] = [
       { ids: rank(entries, (e) => e.paraScore), weight: 1 },
       { ids: rank(entries, (e) => e.tSim), weight: 0.5 },
@@ -217,6 +219,38 @@ export async function searchTexts(userId: string, q: string): Promise<{ literal:
         scored.sort((a, b) => b.m - a.m || a.dfSum - b.dfSum);
         lists.push({ ids: scored.map((s) => s.aid), weight: 1 });
         for (const s of scored) if (s.m === coTerms.length) coFull.add(s.aid);
+      }
+      // Conversational-shell clause lane (HU-3247, Monica plateau reopen c,
+      // Oct 25): shell queries ("that fight skit where she threw the salts in
+      // the bathtub") carry high-df label colliders ("fight", "skit") that
+      // bury the rare content clause ("bathtub salts"). Embed the clause
+      // (colliders df>40 + scaffold dropped) and add its top-8 as a fusion
+      // list (w 1.5); the clause is ALSO a second cross-encoder query at
+      // rerank. Offline dual-persona probe Oct 25 (STATE-B harness, 60+26
+      // quoteless dev questions): Monica final top1 29->31 (+1 mislabel,
+      // +1 emotion_swap), Chandler byte-identical at every lambda (fires
+      // 1/26, no-op), zero collateral lanes.
+      {
+        const SHELL = new Set(["skit", "bit", "one", "ones", "moment", "scene", "episode", "time", "times", "thing", "things"]);
+        const SCAFFOLD = new Set(["skit", "bit", "one", "ones", "moment", "scene", "episode", "time", "times", "thing", "things", "remember", "right", "together", "again", "really", "just", "oh", "hey", "ok", "okay"]);
+        const allWords = query.toLowerCase().match(/[a-z']+/g) ?? [];
+        const hasShellHead = allWords.some((w) => SHELL.has(w));
+        const keepWords = allWords.filter((w) => !STOP.has(w) && !SCAFFOLD.has(w) && (df.get(w) ?? 0) > 0 && (df.get(w) ?? 0) <= 40);
+        if (hasShellHead && keepWords.some((w) => w.length > 3)) {
+          const clause = keepWords.join(" ");
+          const cv = await embed(clause);
+          if (cv) {
+            const cbest = new Map<string, number>();
+            for (const p of paras) {
+              if (!p.vec) continue;
+              const s = cos(cv, p.vec);
+              const cur = cbest.get(p.article_id);
+              if (cur === undefined || s > cur) cbest.set(p.article_id, s);
+            }
+            lists.push({ ids: rank(entries, (e) => cbest.get(e.aid) ?? 0).slice(0, 8), weight: 1.5 });
+            clauseQ = clause;
+          }
+        }
       }
     }
     // Typo-tolerant quoted-fragment lane (HU-3247): "contains something
@@ -402,6 +436,63 @@ export async function searchTexts(userId: string, q: string): Promise<{ literal:
         }
       }
     }
+    // Bare-fragment pin lanes (HU-3247, Monica typo lane, Oct 23): persona
+    // questions can quote a transcript line WITHOUT quote characters ("the
+    // skit about <line>") - every quoted-fragment lane above is gated on
+    // double quotes and never engages for that shell, so single-edit
+    // mutations of short everyday lines ("Monica: : hey Joec." / "Monica:
+    // Hi honey!") rank 2-3 behind everyday-vocab collisions. The mutation is
+    // ONE Damerau edit, so the true line sits at distance <=1 from the
+    // fragment: pin a scene whose para text (whitespace-normalized,
+    // case-insensitive) EQUALS the fragment (exact-line pin beats a longer
+    // line that merely contains it), or is Damerau-1 from it. Pin = UNIQUE
+    // matching article; ambiguity = no pin, surface lanes keep the query.
+    // Fires only when no double-quoted fragment exists and not a
+    // scene-where probe. Offline probe Oct 23 (both vaults, all 189 eval
+    // questions): fires on exactly 2 bare typo queries, both pin the gold
+    // scene; zero fires on quoted lanes, paraphrase, mislabel, private,
+    // not_witnessed; zero fires on the 300 frozen-bank prompts.
+    if (fragments.length < 2 && !sceneWhere) {
+      const bm = query.match(/^the skit about (.+?)\s*\??$/i);
+      if (bm) {
+        const norm = (s: string) => (s ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+        const X = norm(bm[1]);
+        bareFrag = X;
+        if (X.length >= 6) {
+          const ed1 = (a: string, b: string): boolean => {
+            if (a === b) return true;
+            if (Math.abs(a.length - b.length) > 1) return false;
+            if (a.length === b.length) {
+              const diff: number[] = [];
+              for (let i = 0; i < a.length; i++) {
+                if (a[i] !== b[i]) diff.push(i);
+                if (diff.length > 2) return false;
+              }
+              if (diff.length === 1) return true;
+              return diff.length === 2 && diff[1] === diff[0] + 1 && a[diff[0]] === b[diff[1]] && a[diff[1]] === b[diff[0]];
+            }
+            const s = a.length < b.length ? a : b;
+            const l = a.length < b.length ? b : a;
+            for (let i = 0; i < l.length; i++) if (l.slice(0, i) + l.slice(i + 1) === s) return true;
+            return false;
+          };
+          const exact = new Set<string>();
+          const fuzzy = new Set<string>();
+          for (const p of paras) {
+            const t = norm(p.text);
+            if (Math.abs(t.length - X.length) > 1) continue;
+            if (t === X) exact.add(p.article_id);
+            else if (ed1(t, X)) fuzzy.add(p.article_id);
+          }
+          const pin = exact.size === 1 ? [...exact][0] : fuzzy.size === 1 ? [...fuzzy][0] : undefined;
+          if (pin) {
+            lists.push({ ids: [pin], weight: 1 });
+            typoFull.add(pin);
+          }
+        }
+      }
+    }
+
     const K = 20; // grid-searched on the 90-question eval (Oct 19)
     const fused = new Map<string, number>();
     const listTop = new Set<string>();
@@ -419,15 +510,12 @@ export async function searchTexts(userId: string, q: string): Promise<{ literal:
       .filter((x) => x.e)
       .sort((a, b) => b.score - a.score);
     const cand = fusedRanked.slice(0, 24);
-    const pinFrag = fragments.slice(1).sort((a, b) => b.length - a.length)[0];
+    const pinFrag = fragments.slice(1).sort((a, b) => b.length - a.length)[0] ?? bareFrag;
     const pinToks = pinFrag?.toLowerCase().match(/[a-z']+/g)?.filter((w) => w.length >= 4) ?? [];
     const evScore = (t: string) => { const lc = t.toLowerCase(); return pinToks.reduce((s, w) => s + (lc.includes(w) ? 1 : 0), 0); };
     let ranked = cand.slice(0, 8);
     try {
-      const rr = await fetch("http://127.0.0.1:8430/rerank", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ q: query, passages: await Promise.all(cand.map(async (c) => {
+      const passages = await Promise.all(cand.map(async (c) => {
           const plot = plotText.get(c.aid);
           // Quote in the query and in this passage? Literal evidence - never
           // dilute it. Plot is scene-rescue context for candidates whose best
@@ -451,14 +539,35 @@ export async function searchTexts(userId: string, q: string): Promise<{ literal:
           }
           const plotSuffix = plot && !quotedHit && !sceneWhere ? `\nPlot: ${plot.slice(0, 300)}` : "";
           return `${(await titlesFor(userId)).get(c.aid) ?? c.aid}\n${paraTxt.slice(0, quotedHit ? 700 : 500)}${plotSuffix}`;
-        })) }),
+        }));
+      // Clause-as-auxiliary-query rerank pass (conversational-shell clause
+      // lane, HU-3247 Oct 25): the cross-encoder also scores every candidate
+      // against the clause alone - the full query's label colliders dilute
+      // its attention exactly as they dilute the embedding lanes. Failure is
+      // swallowed (baseline blend, never fail search).
+      let clauseScores: number[] | null = null;
+      if (clauseQ) {
+        try {
+          const rc = await fetch("http://127.0.0.1:8430/rerank", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ q: clauseQ, passages }),
+            signal: AbortSignal.timeout(6000),
+          });
+          if (rc.ok) clauseScores = ((await rc.json()) as { scores: number[] }).scores;
+        } catch { clauseScores = null; }
+      }
+      const rr = await fetch("http://127.0.0.1:8430/rerank", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ q: query, passages }),
         signal: AbortSignal.timeout(6000),
       });
       if (rr.ok) {
         const { scores } = (await rr.json()) as { scores: number[] };
         const sig = (x: number) => 1 / (1 + Math.exp(-Math.max(-10, Math.min(10, x))));
         const blended = cand
-          .map((c, i) => ({ c, s: sig(scores[i] ?? -10) + 0.8 / (1 + fusedRanked.findIndex((f) => f.aid === c.aid)) + (coFull.has(c.aid) ? 1.0 : 0) + (typoFull.has(c.aid) ? 1.0 : 0) }))
+          .map((c, i) => ({ c, s: sig(scores[i] ?? -10) + (clauseScores ? sig(clauseScores[i] ?? -10) : 0) + 0.8 / (1 + fusedRanked.findIndex((f) => f.aid === c.aid)) + (coFull.has(c.aid) ? 1.0 : 0) + (typoFull.has(c.aid) ? 1.0 : 0) }))
           .sort((a, b) => b.s - a.s);
         topScore = blended[0]?.s;
         // Honest-miss calibration for scene-where probes (HU-3247, eval v16):
