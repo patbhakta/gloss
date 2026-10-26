@@ -199,7 +199,8 @@ function hueOf(hex: string) {
 const looks = new Map<string, Look>();
 
 export function lookOf(b: Pick<Book, "id" | "topic" | "minutes">): Look {
-  const key = `${b.id}:${b.topic}:${b.minutes}`;
+  const minutes = Number.isFinite(b.minutes) && b.minutes > 0 ? b.minutes : 1;
+  const key = `${b.id}:${b.topic}:${minutes}`;
   const hit = looks.get(key);
   if (hit) return hit;
   const r = rng(hash(b.id));
@@ -213,7 +214,7 @@ export function lookOf(b: Pick<Book, "id" | "topic" | "minutes">): Look {
     fg: light ? "#2a2520" : "#f6efe2",
     light,
     style: STYLES[Math.floor(r() * STYLES.length)],
-    w: Math.round(Math.min(74, Math.max(30, 22 + Math.sqrt(b.minutes) * 4.8))),
+    w: Math.round(Math.min(74, Math.max(30, 22 + Math.sqrt(minutes) * 4.8))),
     h: Math.round(204 + r() * 54),
     hue: hueOf(color),
   };

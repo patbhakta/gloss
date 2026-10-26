@@ -100,7 +100,7 @@ export function wordCount(a: Article): number {
   return w;
 }
 
-export const readingMinutes = (words: number) => Math.max(1, Math.round(words / 230));
+export const readingMinutes = (words: number) => Math.max(1, Math.round((Number.isFinite(words) && words > 0 ? words : 0) / 230));
 
 /** Normalize model or source text so no em or en dash ever reaches the page. */
 export function undash(s: string): string {

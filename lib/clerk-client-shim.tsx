@@ -1,5 +1,8 @@
 "use client";
 
+import { useSyncExternalStore } from "react";
+import { LIMBICS } from "./limbics";
+
 /**
  * bhakta.us: client-side Clerk shim. Renders children as if signed in;
  * buttons become no-ops. Keeps upstream components compiling untouched.
@@ -13,7 +16,7 @@ export const LOCAL_USER = {
 };
 
 /** The persona labels that match lib/clerk-shim LIMBICS server-side. */
-const LIMBIC_LABELS: Record<string, string> = { pat: "Pat", chandler: "Chandler" };
+const LIMBIC_LABELS: Record<string, string> = Object.fromEntries(LIMBICS.map(l => [l.id, l.label]));
 
 /** The active limbic id, from the same `limbic` cookie the server shim reads. */
 export function limbicId(): string {
@@ -21,19 +24,25 @@ export function limbicId(): string {
 }
 
 /** The active limbic, from the same `limbic` cookie the server shim reads. */
-function limbicUser() {
-  const id = limbicId();
+const subscribe = () => () => {};
+const serverSnapshot = () => "";
+
+/** SSR and first hydration agree. Do not start sync until the browser resolves its tenant. */
+function useLimbicUser() {
+  const id = useSyncExternalStore(subscribe, limbicId, serverSnapshot);
+  if (!id) return null;
   const label = LIMBIC_LABELS[id] ?? "Pat";
   return { id, firstName: label, fullName: label, imageUrl: "" };
 }
 
 export function useUser() {
-  const u = limbicUser();
-  return { user: { ...LOCAL_USER, ...u }, isSignedIn: true, isLoaded: true };
+  const user = useLimbicUser();
+  return { user, isSignedIn: Boolean(user), isLoaded: Boolean(user) };
 }
 
 export function useAuth() {
-  return { userId: limbicUser().id, isSignedIn: true, isLoaded: true };
+  const user = useLimbicUser();
+  return { userId: user?.id ?? null, isSignedIn: Boolean(user), isLoaded: Boolean(user) };
 }
 
 export function useClerk() {
