@@ -50,11 +50,23 @@ function stable(v: unknown): string {
   return JSON.stringify(v) ?? "null";
 }
 
+/** Compact change fingerprints: never persist entire article/highlight JSON twice. */
+function entityKey(data: unknown): string {
+  const text = stable(data);
+  let a = 2166136261, b = 3339675911;
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i);
+    a = Math.imul(a ^ c, 16777619);
+    b = Math.imul(b ^ c, 2246822519);
+  }
+  return `v2:${text.length}:${(a >>> 0).toString(16)}:${(b >>> 0).toString(16)}`;
+}
+
 function snapshot(): Snapshot {
   const st = useStore.getState();
   const entities = Object.fromEntries(COLLECTIONS.map((c) => [c, new Map<string, Entity>()])) as Snapshot["entities"];
   const busy = new Set<string>();
-  const put = (c: Collection, id: string, articleId: string, data: unknown) => entities[c].set(id, { articleId, data, key: stable(data) });
+  const put = (c: Collection, id: string, articleId: string, data: unknown) => entities[c].set(id, { articleId, data, key: entityKey(data) });
 
   for (const item of st.library) put("articles", item.id, item.id, item);
   for (const [aid, list] of Object.entries(st.highlights)) for (const h of list) put("highlights", h.id, aid, h);
@@ -95,6 +107,15 @@ export function startSync(userId: string) {
     const raw = localStorage.getItem(storeKey);
     if (raw) base = { ...emptyBaseline(), ...JSON.parse(raw) };
   } catch {}
+  const local = snapshot().entities;
+  const legacy = COLLECTIONS.some(c => Object.values(base.seen[c] ?? {}).some(([key]) => !key.startsWith("v2:")));
+  const incomplete = COLLECTIONS.some(c => Object.keys(base.seen[c] ?? {}).some(id => !local[c].has(id)));
+  // A quota-evicted or partially saved shelf must not retain a delta cursor.
+  // Recover server truth before any push can mistake missing cache entries for deletions.
+  if (legacy || incomplete) {
+    base = emptyBaseline();
+    try { localStorage.removeItem(storeKey); } catch {}
+  }
   const save = () => {
     try {
       localStorage.setItem(storeKey, JSON.stringify(base));
@@ -187,7 +208,7 @@ export function startSync(userId: string) {
     // A text replaced on another device: drop this device's copy so it is fetched fresh on open.
     for (const r of changes.articles ?? []) {
       const before = base.seen.articles[r.id];
-      if (!r.deleted && r.data && before && (r.data as { rev?: number }).rev !== undefined && stable(r.data) !== before[0]) void forgetDoc(r.id);
+      if (!r.deleted && r.data && before && (r.data as { rev?: number }).rev !== undefined && entityKey(r.data) !== before[0]) void forgetDoc(r.id);
       // Removed on another device: its painted cover goes from this one too.
       if (r.deleted) void forgetCover(r.id);
     }
