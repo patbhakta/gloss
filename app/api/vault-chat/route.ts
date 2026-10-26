@@ -1,3 +1,4 @@
+import { personaChat } from "@/lib/persona-chat";
 import { authApi } from "@/lib/clerk-shim";
 import { checkAnswer, redactPII } from "@/lib/guardrails";
 import { db } from "@/lib/db";
@@ -18,7 +19,7 @@ export const maxDuration = 120;
  * return plain JSON for the client's fallback path.
  */
 
-type Body = { q?: string; history?: { role: "user" | "assistant"; content: string }[] };
+type Body = { personaChat?: boolean; q?: string; history?: { role: "user" | "assistant"; content: string }[] };
 
 const SYSTEM = [
   "You answer questions about the reader's personal library of texts.",
@@ -41,6 +42,10 @@ export async function POST(req: Request) {
   }
   const q = (body.q ?? "").trim().slice(0, 500);
   if (!q) return Response.json({ error: "A question is required." }, { status: 400 });
+  if (body.personaChat === true) {
+    try { return await personaChat(userId, q); }
+    catch { return Response.json({ error: "I couldn't connect. Give me a moment and try again." }, { status: 503 }); }
+  }
   const history = (body.history ?? []).slice(-8).filter((m) => m && (m.role === "user" || m.role === "assistant"));
 
   // 1. Retrieve: the proven shelf-search lane, both literal and semantic.
