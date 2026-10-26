@@ -54,7 +54,7 @@ Never emit transcript dumps, speaker labels, stage directions, internal article/
 Return JSON {"answer":"...","references":[1]}. Put numbered references inline like [1] after supported claims; references lists only those numbers actually used. For a recipe name preserve its human-readable name. Never cite a number not supplied. No headings or markdown links.`;
   for (let attempt = 0; attempt < 2; attempt++) {
     const result = await completeJSON<{ answer: string; references: number[] }>({
-      model: DEFAULT_MODEL, maxTokens: 1000,
+      model: DEFAULT_MODEL, maxTokens: 1000, signal: AbortSignal.timeout(45000),
       messages: [{ role: "system", content: system }, { role: "user", content: JSON.stringify({
         message: q, evidence: sources.map(s => ({ number: s.number, title: s.title, text: s.snippet })),
         ...(attempt ? { revision: "Write a conversational answer with valid numbered references. Do not output raw evidence." } : {}),

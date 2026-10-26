@@ -8,7 +8,7 @@ let calls = 0;
 let searches = 0;
 let fail = false;
 const code = stripTypeScriptTypes(readFileSync('lib/persona-chat.ts', 'utf8').replace(/^import .*;\n/gm, '').replace(/export /g, ''));
-const context = vm.createContext({ Response, console, process: { env: { GLM_BASE_URL: "http://subscription.invalid" } },
+const context = vm.createContext({ Response, console, AbortSignal, process: { env: { GLM_BASE_URL: "http://subscription.invalid" } },
   db: () => ({ query: async (sql, params) => {
     assert.match(sql, /user_id = \$1/); assert.equal(params[0], 'monica');
     return [{ id: 'note', data: { title: 'Hosting note' }, doc: { blocks: [{ id: 'b000', runs: [{ text }] }] } }];
