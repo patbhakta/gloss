@@ -18,18 +18,27 @@ const PERSONAS = new Set(Object.keys(PERSONA_VOICES));
 // zai lane caps stop sequences at 4; the output sanitizer is the second line of defence.
 const STOP_SEQUENCES = ["\nJoey:", "\nMonica:", "\nChandler:", "\nScene:"];
 const DEFAULT_CONTEXT_BUDGET_TOKENS = 5000;
+const DEFAULT_CONTEXT_MAX_CHARS = 8000;
+const MAX_EVIDENCE_SOURCES = 15;
 
 function contextBudgetTokens(): number {
   const configured = Number(process.env.PERSONA_CONTEXT_BUDGET_TOKENS);
   return Number.isFinite(configured) && configured > 0 ? Math.floor(configured) : DEFAULT_CONTEXT_BUDGET_TOKENS;
 }
 
+function contextMaxChars(): number {
+  const configured = Number(process.env.PERSONA_CONTEXT_MAX_CHARS);
+  return Number.isFinite(configured) && configured > 0 ? Math.floor(configured) : DEFAULT_CONTEXT_MAX_CHARS;
+}
+
 const REWRITE_STOP = new Set("a an and are as at be by for from had has have how i in is it of on or that the their this to was what when where with you".split(" "));
 
 /** Cheap history grounding for pronouns and short follow-ups; no model call. */
 export function rewritePersonaQuery(q: string, conversation: PersonaTurn[]): string {
-  if (!conversation.length || !/\b(it|that|this|they|them|her|him|there|what about|how about|and why)\b/i.test(q)) return q;
-  const prior = conversation.filter(turn => turn.role === "user").slice(-3).map(turn => turn.content).join(" ");
+  const wordsInQuery = q.match(/[a-z0-9']+/gi)?.length ?? 0;
+  const ambiguous = /\b(it|that|this|they|them|her|him|there|what about|how about|and why|why so)\b/i.test(q) || wordsInQuery <= 5;
+  if (!conversation.length || !ambiguous) return q;
+  const prior = conversation.slice(-6).map(turn => turn.content).join(" ");
   const terms = prior.toLowerCase().match(/[a-z0-9']+/g)?.filter(word => word.length > 2 && !REWRITE_STOP.has(word)) ?? [];
   const context = [...new Set(terms)].slice(-10).join(" ");
   return context ? `${q} ${context}` : q;
@@ -77,7 +86,7 @@ export async function personaChat(userId: string, q: string) {
     const { literal, semantic, notes = [], summaries = [] } = await searchTexts(userId, rewrittenQuery);
     const literalSearchMs = Date.now() - retrievalStarted;
     const budgetTokens = contextBudgetTokens();
-    const budgetChars = budgetTokens * 4;
+    const budgetChars = Math.min(budgetTokens * 4, contextMaxChars());
     const seen = new Set<string>();
     // Literal ranking is the gate. Semantic hits are an optional rerank lane,
     // never a prerequisite for a document or note written moments ago.
@@ -96,7 +105,7 @@ export async function personaChat(userId: string, q: string) {
     // The personal layer has priority. Notes are already query-ranked by the
     // literal search and are trimmed before article slices consume the dial.
     for (const note of notes) {
-      if (contextChars >= budgetChars) break;
+      if (contextChars >= budgetChars || sources.length >= MAX_EVIDENCE_SOURCES) break;
       const remaining = budgetChars - contextChars;
       const text = redactPII(note.text).text.slice(0, Math.min(3000, remaining));
       if (!text) continue;
@@ -108,7 +117,7 @@ export async function personaChat(userId: string, q: string) {
     // Distilled layers guide recall before raw text. Raw blocks are still
     // hydrated below so a citation points to the authoritative scene.
     for (const summary of summaries) {
-      if (contextChars >= budgetChars) break;
+      if (contextChars >= budgetChars || sources.length >= MAX_EVIDENCE_SOURCES) break;
       const remaining = budgetChars - contextChars;
       const text = redactPII(summary.text).text.slice(0, Math.min(3000, remaining));
       if (!text) continue;
@@ -119,7 +128,7 @@ export async function personaChat(userId: string, q: string) {
 
     if (articleHits.length) {
       for (const hit of articleHits) {
-        if (contextChars >= budgetChars) break;
+        if (contextChars >= budgetChars || sources.length >= MAX_EVIDENCE_SOURCES) break;
         const row = rows.find(r => r.id === hit.articleId);
         const doc = row?.doc as { blocks?: { id: string; runs?: { text?: string }[] }[] } | undefined;
         const block = doc?.blocks?.find(b => b.id === hit.blockId);
@@ -134,7 +143,7 @@ export async function personaChat(userId: string, q: string) {
         contextChars += Math.min(text.length, remaining);
       }
     }
-    console.info("persona-chat timing", JSON.stringify({ persona: userId, budgetTokens, queryRewriteMs, literalSearchMs: literalSearchMs - queryRewriteMs, contextAssemblyMs: Date.now() - retrievalStarted - literalSearchMs, contextChars, summaryHits: summaries.length, literalHits: literal.length, noteCount: notes.length, rewritten: rewrittenQuery !== q }));
+    console.info("persona-chat timing", JSON.stringify({ persona: userId, budgetTokens, budgetChars, queryRewriteMs, literalSearchMs: literalSearchMs - queryRewriteMs, contextAssemblyMs: Date.now() - retrievalStarted - literalSearchMs, contextChars, sourceCount: sources.length, summaryHits: summaries.length, literalHits: literal.length, noteCount: notes.length, rewritten: rewrittenQuery !== q }));
   }
   const system = `You are ${PERSONA_VOICES[userId]}
 Write a natural, short in-character conversational answer in English. A greeting gets a greeting, without citations or library discussion.

@@ -100,9 +100,14 @@ export async function searchTexts(userId: string, q: string): Promise<SearchResu
 
   // Highlights with a written note are the personal/emotional layer. Always
   // return them, including notes that do not contain query words.
-  const noteRows = await db().query("select id, article_id, data from highlights where user_id = $1 and not deleted and coalesce(data->>'note', '') <> '' order by updated_at asc", [userId]) as unknown as { id: string; article_id: string; data?: { note?: string; anchor?: { start?: { b?: string } } } }[];
+  const noteRows = await db().query("select id, article_id, data from highlights where user_id = $1 and not deleted and coalesce(data->>'note', '') <> '' order by updated_at desc", [userId]) as unknown as { id: string; article_id: string; data?: { note?: string; anchor?: { start?: { b?: string } } } }[];
   const notes = noteRows.map(row => ({ id: row.id, articleId: row.article_id, blockId: row.data?.anchor?.start?.b ?? "", text: row.data?.note?.trim() ?? "" }))
     .filter(note => note.text)
     .sort((a, b) => score(b.text, query) - score(a.text, query));
+  // Notes participate in the literal candidate pool as first-class evidence;
+  // the persona assembler also keeps them in the personal tier.
+  const noteCandidates = notes.map(note => ({ articleId: note.articleId, blockId: `note:${note.id}`, snippet: snippet(note.text, query), score: score(note.text, query) }))
+    .filter(candidate => (candidate.score ?? 0) > 0).slice(0, 50);
+  literal = [...noteCandidates, ...literal].sort((a, b) => (b.score ?? 0) - (a.score ?? 0)).slice(0, 100);
   return { literal, semantic: [], notes, summaries, topScore: literal[0]?.score };
 }
