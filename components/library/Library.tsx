@@ -308,6 +308,11 @@ function editsWithin(a: string, b: string, budget: number): boolean {
     [router]
   );
 
+  // A shelf item is an affordance for reading. Keep the take-down animation
+  // available through the explicit book sheet, but never make a reader click
+  // twice before reaching the text.
+  const openReader = useCallback((b: Book) => read(b), [read]);
+
   const openBook = open ? books.find((b) => b.id === open.id) ?? null : null;
   const first = user?.firstName;
   const owner = user?.fullName || first || "A Gloss reader";
@@ -467,18 +472,26 @@ function editsWithin(a: string, b: string, budget: number): boolean {
                     <div className="lib-chips no-scrollbar">{tagChips(books.filter((b) => b.topic === T.key))}</div>
                   </div>
                 }
-                onOpen={(b, el) => setOpen({ id: b.id, origin: { el, kind: "cover" } })}
+                onOpen={(b) => openReader(b)}
               />
             ) : view === "shelf" ? (
               <>
-                {hydrated && (
+                {hydrated && books.length === 0 && isSignedIn ? (
+                  <div className="grid min-h-[280px] place-items-center py-16 text-center" aria-live="polite" aria-busy="true">
+                    <div>
+                      <div className="mx-auto mb-3 size-5 animate-spin rounded-full border-2 border-rule border-t-ink-2" aria-hidden />
+                      <p className="font-serif text-[22px] text-ink">Opening your shelf…</p>
+                      <p className="mt-1 text-[13px] text-ink-3">Fetching your saved texts and notes.</p>
+                    </div>
+                  </div>
+                ) : hydrated && (
                   <Shelf
                     books={sorted}
                     shown={shown}
                     sort={sort}
                     openId={open?.id ?? null}
                     fresh={fresh}
-                    onOpen={(b, el) => setOpen({ id: b.id, origin: { el, kind: "spine" } })}
+                    onOpen={(b) => openReader(b)}
                     onLabel={sort === "topic" ? (k) => go({ view: "topics", topic: k as TopicKey }) : undefined}
                   />
                 )}
