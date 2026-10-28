@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { embed } from "@/lib/embedding-index";
 
 /**
  * Search across a reader's own texts: literal (substring, honest) and
@@ -10,24 +11,6 @@ import { db } from "@/lib/db";
 type Row = { article_id: string; block_id: string; text: string; vec: number[] | null };
 
 export type Hit = { articleId: string; blockId: string; snippet: string; score?: number };
-
-const EMBED_URL = "http://127.0.0.1:1234/v1/embeddings";
-const EMBED_MODEL = "text-embedding-nomic-embed-text-v1.5";
-
-export async function embed(input: string): Promise<number[] | null> {
-  try {
-    const r = await fetch(EMBED_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model: EMBED_MODEL, input }),
-    });
-    if (!r.ok) return null;
-    const j = (await r.json()) as { data?: { embedding?: number[] }[] };
-    return j.data?.[0]?.embedding ?? null;
-  } catch {
-    return null;
-  }
-}
 
 function cos(a: number[], b: number[]): number {
   let dot = 0, na = 0, nb = 0;
@@ -60,10 +43,30 @@ export async function searchTexts(userId: string, q: string): Promise<{ literal:
   const query = q.trim();
   let topScore: number | undefined;
   if (query.length < 2) return { literal: [], semantic: [] };
-  const paras = (await db().query(
+  let paras = (await db().query(
     "select article_id, block_id, text, vec from para_embeds where user_id = $1",
     [userId],
   )) as unknown as Row[];
+  // Fresh synced notes may briefly have no embedding. Read the source article
+  // as a literal fallback so the memory loop works even if the local embedder
+  // is unavailable; the write path normally fills para_embeds immediately.
+  try {
+    const articles = (await db().query(
+      "select id, doc from articles where user_id = $1 and not deleted and doc is not null",
+      [userId],
+    )) as unknown as { id: string; doc?: { blocks?: { id: string; runs?: { text?: string }[]; rows?: unknown[][]; type?: string }[] } }[];
+    const indexed = new Set(paras.map((p) => `${p.article_id}/${p.block_id}`));
+    const fresh: Row[] = [];
+    for (const article of articles) {
+      for (const block of article.doc?.blocks ?? []) {
+        const text = block.type === "table" && block.rows
+          ? block.rows.map((row) => row.map((cell) => String(cell ?? "")).join(" | ")).join("\n")
+          : (block.runs ?? []).map((run) => run.text ?? "").join("");
+        if (text && !indexed.has(`${article.id}/${block.id}`)) fresh.push({ article_id: article.id, block_id: block.id, text, vec: null });
+      }
+    }
+    paras = paras.concat(fresh);
+  } catch {}
 
   // Literal, honest - but the query may be a whole sentence wrapping a quote:
   // any "quoted fragment" inside it is searched on its own too.

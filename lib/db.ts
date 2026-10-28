@@ -8,6 +8,7 @@
  */
 
 import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
+import { indexArticleEmbeds } from "@/lib/embedding-index";
 
 type Query = { text: string; params?: unknown[] };
 type Sql = {
@@ -126,6 +127,8 @@ export async function pushRows(userId: string, changes: Partial<Record<Collectio
   const gone = (changes.articles ?? []).filter((r) => r.deleted).map((r) => r.id);
   if (gone.length) queries.push(sql.query("delete from covers where user_id = $1 and id = any($2::text[])", [userId, gone]));
   if (queries.length) await sql.transaction(queries);
+  const changedArticles = changes.articles ?? [];
+  if (changedArticles.length) await indexArticleEmbeds(userId, changedArticles);
   // The server is the referee: if a tombstone won against a pushed row, say so,
   // so the device drops the row instead of trusting a push the server refused.
   for (const [t, rows] of Object.entries(changes)) {

@@ -1,4 +1,3 @@
-import { auth } from "@clerk/nextjs/server";
 import { authApi } from "@/lib/clerk-shim";
 import { isCollection, pullRows, pushRows, type Collection, type PushRow } from "@/lib/db";
 
