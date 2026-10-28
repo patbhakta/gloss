@@ -32,6 +32,18 @@
 5. Read: select text and type to ask, `/` asks about the whole text, `j` and `k` walk paragraphs, `B` glosses the whole text, `F` is focus mode, `?` lists every key
 6. Check: `npm run lint && npm run build`, then deploy with `vercel --prod` (set the same variables, plus `NEXT_PUBLIC_SITE_URL=https://usegloss.io`, in the project first)
 
+### Deployment checklist
+
+Before the first live persona-chat request after a schema change, run `npm run db:migrate` against the production `DATABASE_URL`. The migration is idempotent; do not rely on the application boot to create tables. After deploy, verify the writer and tenant routing with a real request:
+
+```sh
+curl -sS -X POST https://usegloss.io/api/persona-chat \
+  -H 'Content-Type: application/json' -H 'X-Tenant-ID: joey' \
+  --data '{"q":"Hey Joey, who am I talking to?"}'
+```
+
+The response must be a clean in-character JSON answer, not a 503 or raw corpus output.
+
 ## Roadmap
 
 - [ ] ship it as a browser extension that opens the same margin on any page

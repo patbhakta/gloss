@@ -31,16 +31,16 @@ export function sanitizePersonaAnswer(value: string, persona: string): string {
 
 export async function getPersonaConversation(userId: string): Promise<PersonaTurn[]> {
   if (!PERSONAS.has(userId)) return [];
-  const rows = await db().query("select turns from persona_conversations where user_id = $1 and persona = $1", [userId]);
+  const rows = await db().query("select turns from persona_conversations where user_id = $1 and persona = $2", [userId, userId]);
   const turns = rows[0]?.turns;
   return Array.isArray(turns) ? turns.slice(-40) as PersonaTurn[] : [];
 }
 
 async function savePersonaConversation(userId: string, turns: PersonaTurn[]) {
   await db().query(
-    `insert into persona_conversations (user_id, persona, turns, updated_at) values ($1, $1, $2::jsonb, now())
+    `insert into persona_conversations (user_id, persona, turns, updated_at) values ($1, $2, $3::jsonb, now())
      on conflict (user_id, persona) do update set turns = excluded.turns, updated_at = now()`,
-    [userId, JSON.stringify(turns.slice(-40))],
+    [userId, userId, JSON.stringify(turns.slice(-40))],
   );
 }
 

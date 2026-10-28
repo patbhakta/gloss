@@ -34,6 +34,40 @@ type Chunk = {
   };
 };
 
+function contentText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (!Array.isArray(value)) return "";
+  return value.map(part => {
+    if (typeof part === "string") return part;
+    if (!part || typeof part !== "object") return "";
+    const item = part as { text?: unknown; content?: unknown };
+    return typeof item.text === "string" ? item.text : typeof item.content === "string" ? item.content : "";
+  }).join("");
+}
+
+function extractJSONObject(raw: string): unknown {
+  const trimmed = raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+  try { return JSON.parse(trimmed); } catch { /* provider may prepend reasoning or a short fence */ }
+  const start = trimmed.indexOf("{");
+  if (start < 0) throw new Error("missing JSON object");
+  let depth = 0;
+  let quoted = false;
+  let escaped = false;
+  for (let i = start; i < trimmed.length; i++) {
+    const char = trimmed[i];
+    if (quoted) {
+      if (escaped) escaped = false;
+      else if (char === "\\") escaped = true;
+      else if (char === '"') quoted = false;
+      continue;
+    }
+    if (char === '"') quoted = true;
+    else if (char === "{") depth++;
+    else if (char === "}" && --depth === 0) return JSON.parse(trimmed.slice(start, i + 1));
+  }
+  throw new Error("incomplete JSON object");
+}
+
 function errorMessage(status: number, body: string): string {
   let msg = body.slice(0, 280);
   try {
@@ -203,12 +237,11 @@ export async function completeJSON<T>(req: {
 
   try {
     const j = JSON.parse(body) as {
-      choices?: { message?: { content?: string } }[];
+      choices?: { message?: { content?: unknown } }[];
       usage?: { prompt_tokens?: number; completion_tokens?: number; prompt_tokens_details?: { cached_tokens?: number } };
     };
-    const raw = j.choices?.[0]?.message?.content ?? "";
-    const jsonText = raw.slice(raw.indexOf("{"), raw.lastIndexOf("}") + 1);
-    const data = JSON.parse(jsonText) as T;
+    const raw = contentText(j.choices?.[0]?.message?.content);
+    const data = extractJSONObject(raw) as T;
     const pt = j.usage?.prompt_tokens ?? 0;
     const cached = j.usage?.prompt_tokens_details?.cached_tokens ?? 0;
     const ct = j.usage?.completion_tokens ?? 0;

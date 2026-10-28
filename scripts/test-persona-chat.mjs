@@ -11,7 +11,11 @@ const code = stripTypeScriptTypes(readFileSync('lib/persona-chat.ts', 'utf8').re
 const context = vm.createContext({ Response, console, AbortSignal, process: { env: { GLM_BASE_URL: "http://subscription.invalid" } },
   db: () => ({ query: async (sql, params) => {
     assert.equal(params[0], 'monica');
-    if (/persona_conversations/.test(sql)) return [];
+    if (/persona_conversations/.test(sql)) {
+      assert.equal(params[1], 'monica');
+      if (/insert into/.test(sql)) assert.match(String(params[2]), /hey|hosting note|hosting note now/);
+      return [];
+    }
     assert.match(sql, /user_id = \$1/);
     return [{ id: 'note', data: { title: 'Hosting note' }, doc: { blocks: [{ id: 'b000', runs: [{ text }] }] } }];
   }}),
