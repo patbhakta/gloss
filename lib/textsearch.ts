@@ -4,10 +4,11 @@ import { embed } from "@/lib/embedding-index";
 /** Document-first retrieval. articles.doc is truth; para_embeds is optional. */
 export type Hit = { articleId: string; blockId: string; snippet: string; score?: number };
 export type NoteHit = { id: string; articleId: string; blockId: string; text: string };
-export type SearchResult = { literal: Hit[]; semantic: Hit[]; notes: NoteHit[]; topScore?: number };
+export type SummaryHit = { articleId: string; title: string; text: string; score?: number };
+export type SearchResult = { literal: Hit[]; semantic: Hit[]; notes: NoteHit[]; summaries: SummaryHit[]; topScore?: number };
 type BlockRow = { articleId: string; blockId: string; text: string };
 type SourceBlock = { id: string; type?: string; runs?: { text?: string }[]; rows?: unknown[][] };
-type ArticleRow = { id: string; doc?: { blocks?: SourceBlock[] } };
+type ArticleRow = { id: string; data?: Record<string, unknown>; doc?: { blocks?: SourceBlock[] } };
 
 const STOP = new Set("a an and are as at be by for from had has have how i in is it of on or that the their this to was what when where with you".split(" "));
 
@@ -65,15 +66,29 @@ async function optionalSemantic(userId: string, query: string, candidates: Hit[]
 
 export async function searchTexts(userId: string, q: string): Promise<SearchResult> {
   const query = q.trim();
-  if (query.length < 2) return { literal: [], semantic: [], notes: [] };
-  const articles = await db().query("select id, doc from articles where user_id = $1 and not deleted and doc is not null", [userId]) as unknown as ArticleRow[];
+  if (query.length < 2) return { literal: [], semantic: [], notes: [], summaries: [] };
+  const articles = await db().query("select id, data, doc from articles where user_id = $1 and not deleted and doc is not null", [userId]) as unknown as ArticleRow[];
+  const briefs = await db().query("select id, data from briefs where user_id = $1 and not deleted", [userId]) as unknown as { id: string; data?: { gist?: string; claims?: { text?: string }[] } }[];
+  const briefByArticle = new Map(briefs.map(row => [row.id, row.data ?? {}]));
+  const summaries = articles.map(article => {
+    const data = article.data ?? {};
+    const brief = briefByArticle.get(article.id) ?? {};
+    const distilled = [
+      data.title, data.dek, data.scene, data.topic,
+      ...(Array.isArray(data.tags) ? data.tags : []),
+      ...(Array.isArray(data.emotions) ? data.emotions : []),
+      brief.gist, ...(brief.claims ?? []).map(claim => claim.text),
+    ].filter(value => typeof value === "string" && value.trim()).join(". ");
+    return { articleId: article.id, title: String(data.title ?? "Library source"), text: distilled, score: score(distilled, query) };
+  }).filter(summary => summary.score > 0).sort((a, b) => b.score - a.score).slice(0, 100);
+  const summaryScores = new Map(summaries.map(summary => [summary.articleId, summary.score]));
   const rows: BlockRow[] = [];
   for (const article of articles) for (const block of article.doc?.blocks ?? []) {
     const text = blockText(block);
     if (text.trim()) rows.push({ articleId: article.id, blockId: block.id, text });
   }
   const fuzzy = await fuzzyArticleScores(userId, query);
-  const ranked = rows.map(row => ({ row, score: score(row.text, query) + (fuzzy.get(row.articleId) ?? 0) * 25 }))
+  const ranked = rows.map(row => ({ row, score: score(row.text, query) + (fuzzy.get(row.articleId) ?? 0) * 25 + (summaryScores.get(row.articleId) ?? 0) * 0.01 }))
     .filter(item => item.score > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, 100);
@@ -89,5 +104,5 @@ export async function searchTexts(userId: string, q: string): Promise<SearchResu
   const notes = noteRows.map(row => ({ id: row.id, articleId: row.article_id, blockId: row.data?.anchor?.start?.b ?? "", text: row.data?.note?.trim() ?? "" }))
     .filter(note => note.text)
     .sort((a, b) => score(b.text, query) - score(a.text, query));
-  return { literal, semantic: [], notes, topScore: literal[0]?.score };
+  return { literal, semantic: [], notes, summaries, topScore: literal[0]?.score };
 }

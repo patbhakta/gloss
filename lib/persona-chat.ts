@@ -74,7 +74,7 @@ export async function personaChat(userId: string, q: string) {
     const retrievalStarted = Date.now();
     const rewrittenQuery = rewritePersonaQuery(q, conversation);
     const queryRewriteMs = Date.now() - retrievalStarted;
-    const { literal, semantic, notes = [] } = await searchTexts(userId, rewrittenQuery);
+    const { literal, semantic, notes = [], summaries = [] } = await searchTexts(userId, rewrittenQuery);
     const literalSearchMs = Date.now() - retrievalStarted;
     const budgetTokens = contextBudgetTokens();
     const budgetChars = budgetTokens * 4;
@@ -105,6 +105,18 @@ export async function personaChat(userId: string, q: string) {
       contextChars += text.length;
     }
 
+    // Distilled layers guide recall before raw text. Raw blocks are still
+    // hydrated below so a citation points to the authoritative scene.
+    for (const summary of summaries) {
+      if (contextChars >= budgetChars) break;
+      const remaining = budgetChars - contextChars;
+      const text = redactPII(summary.text).text.slice(0, Math.min(3000, remaining));
+      if (!text) continue;
+      sources.push({ number: sources.length + 1, id: summary.articleId, blockId: `summary:${summary.articleId}`,
+        title: redactPII(summary.title).text, snippet: text });
+      contextChars += text.length;
+    }
+
     if (articleHits.length) {
       for (const hit of articleHits) {
         if (contextChars >= budgetChars) break;
@@ -122,7 +134,7 @@ export async function personaChat(userId: string, q: string) {
         contextChars += Math.min(text.length, remaining);
       }
     }
-    console.info("persona-chat timing", JSON.stringify({ persona: userId, budgetTokens, queryRewriteMs, literalSearchMs: literalSearchMs - queryRewriteMs, contextAssemblyMs: Date.now() - retrievalStarted - literalSearchMs, contextChars, literalHits: literal.length, noteCount: notes.length, rewritten: rewrittenQuery !== q }));
+    console.info("persona-chat timing", JSON.stringify({ persona: userId, budgetTokens, queryRewriteMs, literalSearchMs: literalSearchMs - queryRewriteMs, contextAssemblyMs: Date.now() - retrievalStarted - literalSearchMs, contextChars, summaryHits: summaries.length, literalHits: literal.length, noteCount: notes.length, rewritten: rewrittenQuery !== q }));
   }
   const system = `You are ${PERSONA_VOICES[userId]}
 Write a natural, short in-character conversational answer in English. A greeting gets a greeting, without citations or library discussion.
