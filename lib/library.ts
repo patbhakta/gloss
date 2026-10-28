@@ -122,6 +122,8 @@ export type Book = {
   minutes: number;
   dek?: string;
   tags: string[];
+  /** Emotional bookshelf lanes assigned by the annotation pass. */
+  emotions: string[];
   favorite: boolean;
   /** 0 to 1. */
   pct: number;
@@ -299,7 +301,14 @@ export function yearOf(published?: string): number | undefined {
 
 /* ---------- what the classifier returns ---------- */
 
-export type Shelving = { topic: string; tags: string[]; scene?: string };
+export type Shelving = { topic: string; tags: string[]; emotions: string[]; scene?: string };
+
+export const EMOTIONS = [
+  "bittersweet", "hopeful", "tender", "joyful", "playful", "peaceful", "curious",
+  "inspired", "nostalgic", "reflective", "anxious", "sad", "angry", "lonely",
+] as const;
+export type EmotionKey = (typeof EMOTIONS)[number];
+export const emotionLabel = (key: string) => key.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
 /** Tags: a few short lowercase words, never the topic's own name. */
 export function cleanTags(v: unknown, topic: string): string[] {
@@ -314,4 +323,10 @@ export function cleanTags(v: unknown, topic: string): string[] {
     if (out.length === 3) break;
   }
   return out;
+}
+
+export function cleanEmotions(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  return v.filter((x): x is string => typeof x === "string" && (EMOTIONS as readonly string[]).includes(x.toLowerCase()))
+    .map((x) => x.toLowerCase()).filter((x, i, all) => all.indexOf(x) === i).slice(0, 3);
 }

@@ -8,7 +8,7 @@ import { TopBar } from "@/components/ui/TopBar";
 import { readingMinutes, tidyTitle, wordCount } from "@/lib/article";
 import { forgetCover, paintAll } from "@/lib/covers";
 import { SAMPLE_SHELF } from "@/lib/classics";
-import { SORTS, sortBooks, TAGS, TOPIC, TOPICS, topicMeta, topicOf, customTopic, type Book, type Sort, type TagKey, type Topic, type TopicKey } from "@/lib/library";
+import { EMOTIONS, emotionLabel, SORTS, sortBooks, TAGS, TOPIC, TOPICS, topicMeta, topicOf, customTopic, type Book, type Sort, type TagKey, type Topic, type TopicKey } from "@/lib/library";
 import { hideSample, useLibraryPrefs } from "@/lib/library-prefs";
 import { SAMPLES } from "@/lib/samples";
 import { applySettings } from "@/lib/settings";
@@ -53,6 +53,7 @@ export function Library() {
   const [topic, setTopic] = useState<TopicKey | null>(null);
   const [only, setOnly] = useState<TopicKey | null>(null);
   const [tag, setTag] = useState<TagKey | null>(null);
+  const [lane, setLane] = useState<{ kind: "emotion" | "topic"; value: string } | null>(null);
   const [sort, setSort] = useState<Sort>("topic");
   const [q, setQ] = useState("");
   const [open, setOpen] = useState<{ id: string; origin: Origin } | null>(null);
@@ -151,6 +152,7 @@ export function Library() {
       minutes: readingMinutes(x.words),
       dek: x.dek,
       tags: x.tags ?? [],
+      emotions: x.emotions ?? [],
       favorite: Boolean(x.favorite),
       pct: read(x.id),
       highlights: marks(x.id),
@@ -170,6 +172,7 @@ export function Library() {
       minutes: readingMinutes(wordCount(a)),
       dek: a.dek,
       tags: [],
+      emotions: [],
       favorite: false,
       pct: read(a.id),
       highlights: marks(a.id),
@@ -210,6 +213,7 @@ function editsWithin(a: string, b: string, budget: number): boolean {
       const words = q.toLowerCase().trim().split(/\s+/).filter(Boolean);
       const t = tag ? TAGS.find((x) => x.key === tag)! : null;
       if (t && !t.test(b)) return false;
+      if (lane && !(lane.kind === "emotion" ? b.emotions.includes(lane.value) : b.tags.includes(lane.value))) return false;
       // Exact first; then the kinda layer: a typo or two still matches
       // (monika -> Monica). Edit distance over whole tokens, no model needed.
       const hay = `${b.title} ${b.author} ${topicMeta(b.topic).name} ${b.tags.join(" ")} ${b.year ?? ""}`.toLowerCase();
@@ -221,7 +225,7 @@ function editsWithin(a: string, b: string, budget: number): boolean {
         return toks.some((t2) => Math.abs(t2.length - w.length) <= allow && editsWithin(w, t2, allow));
       });
     },
-    [q, tag]
+    [q, tag, lane]
   );
   const shownCount = hydrated ? books.filter(match).length : 0;
   const shown = useMemo(() => new Set(sorted.filter((b) => (!only || b.topic === only) && match(b)).map((b) => b.id)), [sorted, only, match]);
@@ -278,7 +282,7 @@ function editsWithin(a: string, b: string, budget: number): boolean {
       setView(to.view);
       setTopic(to.topic ?? null);
       setQ("");
-      if (to.view === "shelf") setTag(null);
+    if (to.view === "shelf") { setTag(null); setLane(null); }
     });
     window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
   }, []);
@@ -340,6 +344,23 @@ function editsWithin(a: string, b: string, budget: number): boolean {
         </Chip>
       );
     });
+
+  const laneChips = (pool: Book[]) => {
+    const topicTags = [...new Set(pool.flatMap((b) => b.tags))].sort();
+    const emotions = EMOTIONS.filter((e) => pool.some((b) => b.emotions.includes(e)));
+    return (
+      <>
+        {emotions.map((e) => {
+          const n = pool.filter((b) => b.emotions.includes(e)).length;
+          return <Chip key={`emotion-${e}`} on={lane?.kind === "emotion" && lane.value === e} onClick={() => setLane(lane?.kind === "emotion" && lane.value === e ? null : { kind: "emotion", value: e })}>{emotionLabel(e)} <span className="lib-n">{n}</span></Chip>;
+        })}
+        {topicTags.map((t) => {
+          const n = pool.filter((b) => b.tags.includes(t)).length;
+          return <Chip key={`topic-${t}`} on={lane?.kind === "topic" && lane.value === t} onClick={() => setLane(lane?.kind === "topic" && lane.value === t ? null : { kind: "topic", value: t })}>{t} <span className="lib-n">{n}</span></Chip>;
+        })}
+      </>
+    );
+  };
 
   return (
     <div className={`library relative z-[1] min-h-dvh transition-[opacity,filter] duration-300 ${leaving ? "opacity-0 blur-[2px]" : ""}`}>
@@ -419,16 +440,18 @@ function editsWithin(a: string, b: string, budget: number): boolean {
 
         {view === "shelf" && !T && (
           <ChipRow label="Filter">
-            <Chip on={!only && !tag} onClick={() => (setOnly(null), setTag(null))}>
+            <Chip on={!only && !tag && !lane} onClick={() => (setOnly(null), setTag(null), setLane(null))}>
               All <span className="lib-n">{books.length}</span>
             </Chip>
             {topics.map(({ topic: t, books: bs }) => (
-              <Chip key={t.key} on={only === t.key} color={t.shades[0]} onClick={() => setOnly(only === t.key ? null : t.key)}>
+              <Chip key={t.key} on={only === t.key} color={t.shades[0]} onClick={() => (setLane(null), setOnly(only === t.key ? null : t.key))}>
                 {t.emoji ? <span aria-hidden className="leading-none">{t.emoji}</span> : <Glyph k={t.key} size={18} />} {t.name} <span className="lib-n">{bs.length}</span>
               </Chip>
             ))}
             {TAGS.some((t) => books.some(t.test)) && <span aria-hidden className="mx-1.5 h-4 w-px shrink-0 self-center bg-rule-strong" />}
             {tagChips(books)}
+            {books.some((b) => b.emotions.length || b.tags.length) && <span aria-hidden className="mx-1.5 h-4 w-px shrink-0 self-center bg-rule-strong" />}
+            {laneChips(books)}
           </ChipRow>
         )}
 

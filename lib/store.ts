@@ -69,6 +69,9 @@ export type LibraryItem = {
   /** One of the library's topics (lib/library.ts); missing until it has been sorted. */
   topic?: string;
   tags?: string[];
+  /** Emotional bookshelf lanes; absent means this row still needs annotation. */
+  emotions?: string[];
+  emotionDone?: boolean;
   /** What the painted cover shows, written when the text is sorted. */
   scene?: string;
   dek?: string;

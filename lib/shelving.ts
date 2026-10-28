@@ -9,7 +9,7 @@
 
 import type { Article } from "./article";
 import { readApiKey } from "./ask";
-import type { Shelving } from "./library";
+import { topicOf, type Shelving } from "./library";
 import { excerptOf } from "./excerpt";
 import { loadDoc, useStore, type LibraryItem } from "./store";
 
@@ -39,8 +39,14 @@ export async function shelveText(a: Text): Promise<void> {
     const s = (await res.json()) as Shelving;
     const st = useStore.getState();
     const cur = st.library.find((x) => x.id === a.id);
-    if (!cur || cur.topic) return;
-    st.shelve(a.id, { topic: s.topic, tags: s.tags.length ? s.tags : undefined, scene: s.scene });
+    if (!cur) return;
+    st.shelve(a.id, {
+      topic: topicOf(cur.topic) === "unsorted" ? s.topic : cur.topic,
+      tags: s.tags.length ? s.tags : cur.tags,
+      emotions: s.emotions,
+      emotionDone: true,
+      scene: cur.scene ?? s.scene,
+    });
   } catch {
     // Unsorted is a fine place to wait.
   } finally {
@@ -51,9 +57,9 @@ export async function shelveText(a: Text): Promise<void> {
 let backfilling = false;
 
 /** Sort what was shelved before the library existed: two at a time, a few dozen a visit. */
-export async function backfill(items: LibraryItem[], limit = 40): Promise<void> {
+export async function backfill(items: LibraryItem[], limit = 135): Promise<void> {
   if (backfilling || resting) return;
-  const todo = items.filter((x) => !x.topic && x.origin !== "sample").slice(0, limit);
+  const todo = items.filter((x) => x.origin !== "sample" && !x.emotionDone).slice(0, limit);
   if (!todo.length) return;
   backfilling = true;
   try {
