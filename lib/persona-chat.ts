@@ -15,7 +15,8 @@ type Source = { number: number; id: string; blockId: string; title: string; snip
 export type PersonaTurn = { role: "user" | "assistant"; content: string; sources?: Source[] };
 
 const PERSONAS = new Set(Object.keys(PERSONA_VOICES));
-const STOP_SEQUENCES = ["\nJoey:", "\nMonica:", "\nChandler:", "\nRachel:", "\nPhoebe:", "\nRoss:", "\nScene:", "\n[Scene:", "\n("];
+// zai lane caps stop sequences at 4; the output sanitizer is the second line of defence.
+const STOP_SEQUENCES = ["\nJoey:", "\nMonica:", "\nChandler:", "\nScene:"];
 
 /** Remove corpus formatting even when the writer ignores the stop sequences. */
 export function sanitizePersonaAnswer(value: string, persona: string): string {
