@@ -4,6 +4,10 @@
 -- are never hard-deleted by the app (a tombstone tells other devices).
 -- Safe to run more than once.
 
+-- Optional deterministic typo/variant retrieval lane. Literal retrieval still
+-- works if an installation cannot enable this extension.
+create extension if not exists pg_trgm;
+
 create table if not exists articles (
   user_id text not null,
   id text not null,

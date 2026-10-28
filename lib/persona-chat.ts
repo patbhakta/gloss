@@ -24,6 +24,17 @@ function contextBudgetTokens(): number {
   return Number.isFinite(configured) && configured > 0 ? Math.floor(configured) : DEFAULT_CONTEXT_BUDGET_TOKENS;
 }
 
+const REWRITE_STOP = new Set("a an and are as at be by for from had has have how i in is it of on or that the their this to was what when where with you".split(" "));
+
+/** Cheap history grounding for pronouns and short follow-ups; no model call. */
+export function rewritePersonaQuery(q: string, conversation: PersonaTurn[]): string {
+  if (!conversation.length || !/\b(it|that|this|they|them|her|him|there|what about|how about|and why)\b/i.test(q)) return q;
+  const prior = conversation.filter(turn => turn.role === "user").slice(-3).map(turn => turn.content).join(" ");
+  const terms = prior.toLowerCase().match(/[a-z0-9']+/g)?.filter(word => word.length > 2 && !REWRITE_STOP.has(word)) ?? [];
+  const context = [...new Set(terms)].slice(-10).join(" ");
+  return context ? `${q} ${context}` : q;
+}
+
 /** Remove corpus formatting even when the writer ignores the stop sequences. */
 export function sanitizePersonaAnswer(value: string, persona: string): string {
   let answer = value.replace(/\r/g, "");
@@ -61,7 +72,9 @@ export async function personaChat(userId: string, q: string) {
   const sources: Source[] = [];
   if (!social) {
     const retrievalStarted = Date.now();
-    const { literal, semantic, notes = [] } = await searchTexts(userId, q);
+    const rewrittenQuery = rewritePersonaQuery(q, conversation);
+    const queryRewriteMs = Date.now() - retrievalStarted;
+    const { literal, semantic, notes = [] } = await searchTexts(userId, rewrittenQuery);
     const literalSearchMs = Date.now() - retrievalStarted;
     const budgetTokens = contextBudgetTokens();
     const budgetChars = budgetTokens * 4;
@@ -109,7 +122,7 @@ export async function personaChat(userId: string, q: string) {
         contextChars += Math.min(text.length, remaining);
       }
     }
-    console.info("persona-chat timing", JSON.stringify({ persona: userId, budgetTokens, literalSearchMs, contextAssemblyMs: Date.now() - retrievalStarted - literalSearchMs, contextChars, literalHits: literal.length, noteCount: notes.length }));
+    console.info("persona-chat timing", JSON.stringify({ persona: userId, budgetTokens, queryRewriteMs, literalSearchMs: literalSearchMs - queryRewriteMs, contextAssemblyMs: Date.now() - retrievalStarted - literalSearchMs, contextChars, literalHits: literal.length, noteCount: notes.length, rewritten: rewrittenQuery !== q }));
   }
   const system = `You are ${PERSONA_VOICES[userId]}
 Write a natural, short in-character conversational answer in English. A greeting gets a greeting, without citations or library discussion.

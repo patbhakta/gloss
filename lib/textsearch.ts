@@ -31,18 +31,36 @@ function score(text: string, query: string): number {
   return (hay.includes(q) ? 1000 : 0) + matched * 10 + (words.length ? matched / words.length : 0);
 }
 
-async function optionalSemantic(userId: string, query: string): Promise<Hit[]> {
-  if (process.env.PERSONA_CHAT_SEMANTIC_RERANK !== "1") return [];
+async function fuzzyArticleScores(userId: string, query: string): Promise<Map<string, number>> {
+  try {
+    const rows = await db().query(
+      `select id, similarity(coalesce(data->>'title', '') || ' ' || coalesce(doc::text, ''), $2) as fuzzy
+       from articles where user_id = $1 and not deleted and doc is not null
+       and similarity(coalesce(data->>'title', '') || ' ' || coalesce(doc::text, ''), $2) >= 0.18
+       order by fuzzy desc limit 100`,
+      [userId, query],
+    ) as unknown as { id: string; fuzzy: number }[];
+    return new Map(rows.map(row => [row.id, Number(row.fuzzy)]));
+  } catch {
+    // pg_trgm is optional on existing installations. Literal retrieval stays
+    // authoritative if the extension has not been migrated yet.
+    return new Map();
+  }
+}
+
+async function optionalSemantic(userId: string, query: string, candidates: Hit[]): Promise<Map<string, number>> {
+  if (process.env.PERSONA_CHAT_SEMANTIC_RERANK !== "1") return new Map();
   const qv = await embed(query);
-  if (!qv) return [];
+  if (!qv) return new Map();
   const stored = await db().query("select article_id, block_id, text, vec from para_embeds where user_id = $1", [userId]) as unknown as { article_id: string; block_id: string; text: string; vec: number[] | null }[];
   const cosine = (a: number[], b: number[]) => {
     let dot = 0, aa = 0, bb = 0;
     for (let i = 0; i < Math.min(a.length, b.length); i++) { dot += a[i] * b[i]; aa += a[i] * a[i]; bb += b[i] * b[i]; }
     return dot / (Math.sqrt(aa) * Math.sqrt(bb) || 1);
   };
-  return stored.filter(row => row.vec?.length).map(row => ({ articleId: row.article_id, blockId: row.block_id, snippet: row.text.slice(0, 300), score: cosine(qv, row.vec!) }))
-    .sort((a, b) => (b.score ?? 0) - (a.score ?? 0)).slice(0, 8);
+  const allowed = new Set(candidates.map(candidate => `${candidate.articleId}/${candidate.blockId}`));
+  return new Map(stored.filter(row => row.vec?.length && allowed.has(`${row.article_id}/${row.block_id}`))
+    .map(row => [`${row.article_id}/${row.block_id}`, cosine(qv, row.vec!)] as const));
 }
 
 export async function searchTexts(userId: string, q: string): Promise<SearchResult> {
@@ -54,8 +72,16 @@ export async function searchTexts(userId: string, q: string): Promise<SearchResu
     const text = blockText(block);
     if (text.trim()) rows.push({ articleId: article.id, blockId: block.id, text });
   }
-  const ranked = rows.map(row => ({ row, score: score(row.text, query) })).filter(item => item.score > 0).sort((a, b) => b.score - a.score).slice(0, 80);
-  const literal = ranked.map(({ row, score: value }) => ({ articleId: row.articleId, blockId: row.blockId, snippet: snippet(row.text, query), score: value }));
+  const fuzzy = await fuzzyArticleScores(userId, query);
+  const ranked = rows.map(row => ({ row, score: score(row.text, query) + (fuzzy.get(row.articleId) ?? 0) * 25 }))
+    .filter(item => item.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 100);
+  let literal = ranked.map(({ row, score: value }) => ({ articleId: row.articleId, blockId: row.blockId, snippet: snippet(row.text, query), score: value }));
+  const semanticScores = await optionalSemantic(userId, query, literal);
+  if (semanticScores.size) literal = [...literal].sort((a, b) =>
+    ((b.score ?? 0) + (semanticScores.get(`${b.articleId}/${b.blockId}`) ?? 0) * 0.25) -
+    ((a.score ?? 0) + (semanticScores.get(`${a.articleId}/${a.blockId}`) ?? 0) * 0.25));
 
   // Highlights with a written note are the personal/emotional layer. Always
   // return them, including notes that do not contain query words.
@@ -63,6 +89,5 @@ export async function searchTexts(userId: string, q: string): Promise<SearchResu
   const notes = noteRows.map(row => ({ id: row.id, articleId: row.article_id, blockId: row.data?.anchor?.start?.b ?? "", text: row.data?.note?.trim() ?? "" }))
     .filter(note => note.text)
     .sort((a, b) => score(b.text, query) - score(a.text, query));
-  const semantic = await optionalSemantic(userId, query);
-  return { literal, semantic, notes, topScore: literal[0]?.score };
+  return { literal, semantic: [], notes, topScore: literal[0]?.score };
 }

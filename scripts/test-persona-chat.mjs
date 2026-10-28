@@ -31,8 +31,9 @@ const context = vm.createContext({ Response, console, AbortSignal, process: { en
     return { ok: true, data: { answer: request.evidence.length ? request.evidence[0].text + ' [1]' : 'Hey! Come on in.', references: request.evidence.length ? [1] : [] } };
   },
 });
-vm.runInContext(code + '\nglobalThis.chat = personaChat; globalThis.clean = sanitizePersonaAnswer;', context);
+vm.runInContext(code + '\nglobalThis.chat = personaChat; globalThis.clean = sanitizePersonaAnswer; globalThis.rewrite = rewritePersonaQuery;', context);
 assert.equal(context.clean('Joey: Hey!\n[Scene: Central Perk]\n(laughs) How are you?', 'joey'), 'Hey! How are you?');
+assert.match(context.rewrite('what about her?', [{ role: 'user', content: 'Tell me about Monica hosting dinner' }]), /monica.*hosting.*dinner/);
 const greet = await (await context.chat('monica', 'hey')).json();
 assert.equal(greet.answer, 'Hey! Come on in.'); assert.equal(searches, 0);
 const alpha = await (await context.chat('monica', 'hosting note?')).json();
