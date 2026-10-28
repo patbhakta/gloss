@@ -8,7 +8,10 @@ let calls = 0;
 let searches = 0;
 let fail = false;
 const code = stripTypeScriptTypes(readFileSync('lib/persona-chat.ts', 'utf8').replace(/^import .*;\n/gm, '').replace(/export /g, ''));
-const context = vm.createContext({ Response, console, AbortSignal, process: { env: { GLM_BASE_URL: "http://subscription.invalid" } },
+const context = vm.createContext({ Response, console, AbortSignal, process: { env: {
+  GLM_BASE_URL: "http://subscription.invalid",
+  PERSONA_CONTEXT_BUDGET_TOKENS: process.env.PERSONA_CONTEXT_BUDGET_TOKENS ?? "5000",
+} },
   db: () => ({ query: async (sql, params) => {
     assert.equal(params[0], 'monica');
     if (/persona_conversations/.test(sql)) {

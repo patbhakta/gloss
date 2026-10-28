@@ -17,6 +17,12 @@ export type PersonaTurn = { role: "user" | "assistant"; content: string; sources
 const PERSONAS = new Set(Object.keys(PERSONA_VOICES));
 // zai lane caps stop sequences at 4; the output sanitizer is the second line of defence.
 const STOP_SEQUENCES = ["\nJoey:", "\nMonica:", "\nChandler:", "\nScene:"];
+const DEFAULT_CONTEXT_BUDGET_TOKENS = 5000;
+
+function contextBudgetTokens(): number {
+  const configured = Number(process.env.PERSONA_CONTEXT_BUDGET_TOKENS);
+  return Number.isFinite(configured) && configured > 0 ? Math.floor(configured) : DEFAULT_CONTEXT_BUDGET_TOKENS;
+}
 
 /** Remove corpus formatting even when the writer ignores the stop sequences. */
 export function sanitizePersonaAnswer(value: string, persona: string): string {
@@ -57,6 +63,8 @@ export async function personaChat(userId: string, q: string) {
     const retrievalStarted = Date.now();
     const { literal, semantic, notes = [] } = await searchTexts(userId, q);
     const literalSearchMs = Date.now() - retrievalStarted;
+    const budgetTokens = contextBudgetTokens();
+    const budgetChars = budgetTokens * 4;
     const seen = new Set<string>();
     // Literal ranking is the gate. Semantic hits are an optional rerank lane,
     // never a prerequisite for a document or note written moments ago.
@@ -66,39 +74,42 @@ export async function personaChat(userId: string, q: string) {
       seen.add(key); return true;
     });
     const articleHits = hits.slice(0, 80);
-    if (hits.length) {
-      const rows = await db().query(
-        "select id, data, doc from articles where user_id = $1 and id = any($2::text[]) and deleted = false",
-        [userId, [...new Set(articleHits.map(h => h.articleId))]],
-      );
-      let contextChars = 0;
+    const rows = articleHits.length ? await db().query(
+      "select id, data, doc from articles where user_id = $1 and id = any($2::text[]) and deleted = false",
+      [userId, [...new Set(articleHits.map(h => h.articleId))]],
+    ) : [];
+    let contextChars = 0;
+
+    // The personal layer has priority. Notes are already query-ranked by the
+    // literal search and are trimmed before article slices consume the dial.
+    for (const note of notes) {
+      if (contextChars >= budgetChars) break;
+      const remaining = budgetChars - contextChars;
+      const text = redactPII(note.text).text.slice(0, Math.min(3000, remaining));
+      if (!text) continue;
+      sources.push({ number: sources.length + 1, id: note.articleId, blockId: `note:${note.id}`,
+        title: "Personal note", snippet: text });
+      contextChars += text.length;
+    }
+
+    if (articleHits.length) {
       for (const hit of articleHits) {
+        if (contextChars >= budgetChars) break;
         const row = rows.find(r => r.id === hit.articleId);
         const doc = row?.doc as { blocks?: { id: string; runs?: { text?: string }[] }[] } | undefined;
         const block = doc?.blocks?.find(b => b.id === hit.blockId);
         // Embeddings nominate IDs only: always read the current authoritative document.
         const text = block?.runs?.map(r => r.text ?? "").join("").trim();
         if (!text) continue;
-        // Five thousand tokens is a practical ~20k character budget for the
-        // literal-scored article context. Notes are appended below without
-        // consuming this budget because they are the personal layer.
-        if (contextChars + text.length > 20_000) continue;
+        const remaining = budgetChars - contextChars;
+        if (remaining <= 0) break;
         const title = (row?.data as { title?: string })?.title ?? "Library source";
         sources.push({ number: sources.length + 1, id: hit.articleId, blockId: hit.blockId,
-          title: redactPII(title).text, snippet: redactPII(text).text.slice(0, 3000) });
-        contextChars += text.length;
+          title: redactPII(title).text, snippet: redactPII(text).text.slice(0, Math.min(3000, remaining)) });
+        contextChars += Math.min(text.length, remaining);
       }
-      for (const note of notes) {
-        sources.push({ number: sources.length + 1, id: note.articleId, blockId: `note:${note.id}`,
-          title: "Personal note", snippet: redactPII(note.text).text.slice(0, 3000) });
-      }
-    } else {
-      // Notes are always part of the evidence, even when no article block
-      // matched the question literally.
-      for (const note of notes) sources.push({ number: sources.length + 1, id: note.articleId, blockId: `note:${note.id}`,
-        title: "Personal note", snippet: redactPII(note.text).text.slice(0, 3000) });
     }
-    console.info("persona-chat timing", JSON.stringify({ persona: userId, literalSearchMs, contextAssemblyMs: Date.now() - retrievalStarted - literalSearchMs, literalHits: literal.length, noteCount: notes.length }));
+    console.info("persona-chat timing", JSON.stringify({ persona: userId, budgetTokens, literalSearchMs, contextAssemblyMs: Date.now() - retrievalStarted - literalSearchMs, contextChars, literalHits: literal.length, noteCount: notes.length }));
   }
   const system = `You are ${PERSONA_VOICES[userId]}
 Write a natural, short in-character conversational answer in English. A greeting gets a greeting, without citations or library discussion.
