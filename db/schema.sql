@@ -97,3 +97,14 @@ create table if not exists agent_tokens (
 );
 
 create index if not exists agent_tokens_user on agent_tokens (user_id);
+
+-- Persona chat is server-owned so switching limbics never drops a conversation.
+create table if not exists persona_conversations (
+  user_id text not null,
+  persona text not null,
+  turns jsonb not null default '[]'::jsonb,
+  updated_at timestamptz not null default now(),
+  primary key (user_id, persona)
+);
+
+create index if not exists persona_conversations_updated on persona_conversations (user_id, updated_at);

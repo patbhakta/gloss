@@ -10,7 +10,9 @@ let fail = false;
 const code = stripTypeScriptTypes(readFileSync('lib/persona-chat.ts', 'utf8').replace(/^import .*;\n/gm, '').replace(/export /g, ''));
 const context = vm.createContext({ Response, console, AbortSignal, process: { env: { GLM_BASE_URL: "http://subscription.invalid" } },
   db: () => ({ query: async (sql, params) => {
-    assert.match(sql, /user_id = \$1/); assert.equal(params[0], 'monica');
+    assert.equal(params[0], 'monica');
+    if (/persona_conversations/.test(sql)) return [];
+    assert.match(sql, /user_id = \$1/);
     return [{ id: 'note', data: { title: 'Hosting note' }, doc: { blocks: [{ id: 'b000', runs: [{ text }] }] } }];
   }}),
   searchTexts: async (tenant) => { searches++; assert.equal(tenant, 'monica'); return { literal: [], semantic: [{ articleId: 'note', blockId: 'b000', snippet: 'ALPHA stale' }] }; },
@@ -22,7 +24,8 @@ const context = vm.createContext({ Response, console, AbortSignal, process: { en
     return { ok: true, data: { answer: request.evidence.length ? request.evidence[0].text + ' [1]' : 'Hey! Come on in.', references: request.evidence.length ? [1] : [] } };
   },
 });
-vm.runInContext(code + '\nglobalThis.chat = personaChat;', context);
+vm.runInContext(code + '\nglobalThis.chat = personaChat; globalThis.clean = sanitizePersonaAnswer;', context);
+assert.equal(context.clean('Joey: Hey!\n[Scene: Central Perk]\n(laughs) How are you?', 'joey'), 'Hey! How are you?');
 const greet = await (await context.chat('monica', 'hey')).json();
 assert.equal(greet.answer, 'Hey! Come on in.'); assert.equal(searches, 0);
 const alpha = await (await context.chat('monica', 'hosting note?')).json();

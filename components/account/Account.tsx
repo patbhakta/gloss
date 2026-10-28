@@ -1,18 +1,22 @@
 "use client";
 
+import { useState } from "react";
 import { useUser } from "@/lib/clerk-client-shim";
 import { LIMBICS } from "@/lib/limbics";
 import { barBtn, Popover } from "@/components/ui/Popover";
+import { PersonaChatPanel } from "@/components/persona/PersonaChatPanel";
 
 /**
  * bhakta.us: single-user interim account chip with a limbic (persona) switcher.
  * Each limbic keeps its own shelf, highlights, notes and agent tokens.
  */
 export function Account() {
+  const [chatOpen, setChatOpen] = useState(false);
   const { user } = useUser();
   const currentLimbic = user?.id ?? "";
   const initials = LIMBICS.find((l) => l.id === currentLimbic)?.label.slice(0, 2).toUpperCase() ?? "PB";
   return (
+    <>
     <Popover label="Account" tip="Account and limbic" width={264} triggerClass={barBtn} trigger={
       <span className="grid size-7 place-items-center rounded-full bg-sunk text-[12px] font-semibold text-ink-2 select-none">
         {initials}
@@ -34,9 +38,12 @@ export function Account() {
             {LIMBICS.map(l => <option key={l.id} value={l.id}>{l.label}</option>)}
           </select>
         </div>
+        <button type="button" onClick={() => setChatOpen(true)} className="mt-3 flex w-full items-center justify-center rounded-full bg-ink px-3 py-2 text-[12px] font-medium text-bg transition-opacity hover:opacity-85">Talk with {LIMBICS.find((l) => l.id === currentLimbic)?.label ?? "your persona"}</button>
         <div className="mt-1.5 text-[11.5px] text-ink-3">Accounts and sync arrive with GLS-2 (Better Auth).</div>
       </div>
       )}
     </Popover>
+    {chatOpen && <PersonaChatPanel initialPersona={currentLimbic} onClose={() => setChatOpen(false)} />}
+    </>
   );
 }
