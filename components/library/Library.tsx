@@ -64,6 +64,10 @@ export function Library() {
   const known = useRef<Set<string> | null>(null);
   const [lastSeen, setLastSeen] = useState(0);
 
+  const read = useCallback((b: Book) => {
+    window.location.assign(`/read/${b.id}`);
+  }, []);
+
   useEffect(() => {
     hydrate();
     applySettings(useStore.getState().settings);
