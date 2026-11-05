@@ -54,7 +54,7 @@ export function TopicGrid({ topics, onPick }: { topics: { topic: Topic; books: B
 }
 
 /** One topic, its books face-out, like the table at the front of a bookshop. */
-export function TopicPage({ topic: t, books, tools, onOpen }: { topic: Topic; books: Book[]; tools?: React.ReactNode; onOpen: (b: Book, el: HTMLElement) => void }) {
+export function TopicPage({ topic: t, books, tools }: { topic: Topic; books: Book[]; tools?: React.ReactNode }) {
   return (
     <div style={{ ["--c" as string]: t.shades[0] }}>
       <header className="topic-head">
@@ -84,14 +84,14 @@ export function TopicPage({ topic: t, books, tools, onOpen }: { topic: Topic; bo
       <ul className="face-out">
         {books.map((b, i) => (
           <li key={b.id} style={{ ["--i" as string]: i }}>
-            <button type="button" className="face-btn" aria-label={`${b.title}, ${b.author}`} onClick={(e) => onOpen(b, e.currentTarget.querySelector(".face-cover") as HTMLElement)}>
+            <a href={`/read/${b.id}`} className="face-btn" aria-label={`${b.title}, ${b.author}`}>
               <ViewTransition name={`book-${b.id}`} share="lib-morph" default="none">
                 <div className="face-cover">
                   <Cover book={b} />
                   {b.pct > 0 && b.pct < 1 && <span className="face-ribbon" aria-hidden />}
                 </div>
               </ViewTransition>
-            </button>
+            </a>
             <p className="mt-3 flex items-center gap-2 text-[12.5px] text-ink-3">
               <span>{fmtMinutes(b.minutes)}</span>
               {b.pct > 0 && (

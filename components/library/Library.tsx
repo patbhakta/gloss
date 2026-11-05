@@ -1,7 +1,6 @@
 "use client";
 
 import { useUser } from "@clerk/nextjs";
-import { useRouter } from "next/navigation";
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState, ViewTransition } from "react";
 import { ChevronLeft, ChevronRight, LayoutGrid, Library as LibraryIcon, Search, X } from "lucide-react";
 import { TopBar } from "@/components/ui/TopBar";
@@ -38,7 +37,6 @@ const SAMPLES_UNTIL = 6;
  * drop onto the shelf as they arrive.
  */
 export function Library() {
-  const router = useRouter();
   const { user, isSignedIn } = useUser();
   const hydrate = useStore((s) => s.hydrate);
   const hydrated = useStore((s) => s.hydrated);
@@ -62,7 +60,6 @@ export function Library() {
   const [fresh, setFresh] = useState<Set<string>>(() => new Set());
   // The kinda layer: vector-closest texts for a query nothing on the shelf matches.
   const [semHits, setSemHits] = useState<{ id: string; title: string; snippet: string }[]>([]);
-  const [leaving, setLeaving] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const known = useRef<Set<string> | null>(null);
   const [lastSeen, setLastSeen] = useState(0);
@@ -300,19 +297,6 @@ function editsWithin(a: string, b: string, budget: number): boolean {
     return () => window.removeEventListener("keydown", onKey);
   }, [open, adding, topic, go]);
 
-  const read = useCallback(
-    (b: Book) => {
-      setLeaving(true);
-      router.push(`/read/${b.id}`);
-    },
-    [router]
-  );
-
-  // A shelf item is an affordance for reading. Keep the take-down animation
-  // available through the explicit book sheet, but never make a reader click
-  // twice before reaching the text.
-  const openReader = useCallback((b: Book) => read(b), [read]);
-
   const openBook = open ? books.find((b) => b.id === open.id) ?? null : null;
   const first = user?.firstName;
   const owner = user?.fullName || first || "A Gloss reader";
@@ -368,7 +352,7 @@ function editsWithin(a: string, b: string, budget: number): boolean {
   };
 
   return (
-    <div className={`library relative z-[1] min-h-dvh transition-[opacity,filter] duration-300 ${leaving ? "opacity-0 blur-[2px]" : ""}`}>
+    <div className="library relative z-[1] min-h-dvh">
       <div className="lib-top" data-scrolled={scrolled || undefined}>
         <TopBar here="library" onLibrary={() => go({ view: topic ? "topics" : view })} />
       </div>
@@ -472,7 +456,6 @@ function editsWithin(a: string, b: string, budget: number): boolean {
                     <div className="lib-chips no-scrollbar">{tagChips(books.filter((b) => b.topic === T.key))}</div>
                   </div>
                 }
-                onOpen={(b) => openReader(b)}
               />
             ) : view === "shelf" ? (
               <>
@@ -491,7 +474,6 @@ function editsWithin(a: string, b: string, budget: number): boolean {
                     sort={sort}
                     openId={open?.id ?? null}
                     fresh={fresh}
-                    onOpen={(b) => openReader(b)}
                     onLabel={sort === "topic" ? (k) => go({ view: "topics", topic: k as TopicKey }) : undefined}
                   />
                 )}

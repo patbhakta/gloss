@@ -123,7 +123,6 @@ export function Shelf({
   sort,
   openId,
   fresh,
-  onOpen,
   onLabel,
 }: {
   /** Every book that could be on the shelf, in order. */
@@ -134,7 +133,6 @@ export function Shelf({
   openId: string | null;
   /** Books just added, here or by an agent: they drop in. */
   fresh: Set<string>;
-  onOpen: (b: Book, el: HTMLElement) => void;
   /** A shelf label, clicked: that topic's own page. */
   onLabel?: (key: string) => void;
 }) {
@@ -258,8 +256,8 @@ export function Shelf({
                 data-fresh={fresh.has(b.id) || undefined}
                 style={{ ["--i" as string]: i, transitionDelay: out ? "0ms" : `${80 + Math.min(i, 30) * 14}ms` }}
               >
-                <button
-                  type="button"
+                <a
+                  href={`/read/${b.id}`}
                   data-book={b.id}
                   className="bk"
                   data-open={openId === b.id || undefined}
@@ -268,14 +266,13 @@ export function Shelf({
                   aria-label={`${b.title}, ${b.author}`}
                   data-tip={b.title}
                   data-tip-hint={`${b.author} · ${fmtMinutes(b.minutes)}${b.pct > 0 && b.pct < 1 ? ` · ${Math.round(b.pct * 100)}% read` : b.pct >= 1 ? " · read" : ""}`}
-                  onClick={(e) => onOpen(b, e.currentTarget.querySelector(".spine") as HTMLElement)}
                   onPointerEnter={() => warm(b)}
                   onFocus={() => warm(b)}
                 >
                   <ViewTransition name={`book-${b.id}`} share="lib-morph" default="none">
                     <Spine book={b} look={look} />
                   </ViewTransition>
-                </button>
+                </a>
               </div>
             </div>
           </div>
