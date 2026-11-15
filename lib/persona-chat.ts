@@ -20,7 +20,9 @@ const STOP_SEQUENCES = ["\nJoey:", "\nMonica:", "\nChandler:", "\nScene:"];
 const DEFAULT_CONTEXT_BUDGET_TOKENS = 5000;
 const DEFAULT_CONTEXT_MAX_CHARS = 8000;
 const DEFAULT_MAX_EVIDENCE_SOURCES = 8;
-const DEFAULT_WRITER_MAX_TOKENS = 600;
+// Persona replies are intentionally short; keeping the completion ceiling tight
+// prevents long-tail writer generations from dominating cited-search latency.
+const DEFAULT_WRITER_MAX_TOKENS = 360;
 
 function contextBudgetTokens(): number {
   const configured = Number(process.env.PERSONA_CONTEXT_BUDGET_TOKENS);
